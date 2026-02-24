@@ -1,0 +1,208 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* XPRESS OpsTower - Command Center Theme */
+
+@layer base {
+  :root {
+    --color-bg-primary: #0a0a0f;
+    --color-bg-secondary: #12121a;
+    --color-bg-tertiary: #1a1a2e;
+    --color-bg-elevated: #252542;
+    
+    --color-border: #2a2a45;
+    --color-border-focus: #3b82f6;
+    
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #a0a0b0;
+    --color-text-muted: #6b7280;
+    
+    --color-accent-blue: #3b82f6;
+    --color-accent-cyan: #06b6d4;
+    --color-accent-purple: #8b5cf6;
+    --color-accent-green: #10b981;
+    --color-accent-amber: #f59e0b;
+    --color-accent-red: #ef4444;
+  }
+
+  * {
+    @apply border-xpress-border;
+  }
+
+  html {
+    @apply antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    @apply bg-xpress-bg-primary text-xpress-text-primary font-sans;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-xpress-bg-secondary;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-xpress-bg-elevated rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-xpress-border;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-xpress-accent-blue/30 text-white;
+  }
+}
+
+@layer components {
+  /* XPRESS Card Component */
+  .xpress-card {
+    @apply bg-xpress-bg-tertiary border border-xpress-border rounded-lg;
+  }
+
+  /* XPRESS Button Base */
+  .xpress-button {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-xpress-accent-blue/50;
+  }
+
+  .xpress-button-primary {
+    @apply xpress-button bg-xpress-accent-blue hover:bg-blue-600 text-white;
+  }
+
+  .xpress-button-secondary {
+    @apply xpress-button bg-xpress-bg-elevated hover:bg-xpress-border text-xpress-text-primary;
+  }
+
+  .xpress-button-ghost {
+    @apply xpress-button hover:bg-xpress-bg-tertiary text-xpress-text-secondary;
+  }
+
+  .xpress-button-danger {
+    @apply xpress-button bg-xpress-accent-red/20 hover:bg-xpress-accent-red/30 text-xpress-accent-red border border-xpress-accent-red/30;
+  }
+
+  /* XPRESS Input */
+  .xpress-input {
+    @apply bg-xpress-bg-secondary border border-xpress-border rounded-md px-3 py-2 text-sm text-xpress-text-primary placeholder:text-xpress-text-muted focus:outline-none focus:border-xpress-accent-blue focus:ring-1 focus:ring-xpress-accent-blue/50 transition-all;
+  }
+
+  /* XPRESS Table */
+  .xpress-table {
+    @apply w-full text-sm;
+  }
+
+  .xpress-table th {
+    @apply text-left px-4 py-3 font-semibold text-xpress-text-secondary bg-xpress-bg-secondary border-b border-xpress-border;
+  }
+
+  .xpress-table td {
+    @apply px-4 py-3 border-b border-xpress-border text-xpress-text-primary;
+  }
+
+  .xpress-table tr:hover td {
+    @apply bg-xpress-bg-tertiary/50;
+  }
+
+  /* Status Badges */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-active {
+    @apply badge bg-xpress-status-active/20 text-xpress-status-active;
+  }
+
+  .badge-idle {
+    @apply badge bg-xpress-status-idle/20 text-xpress-status-idle;
+  }
+
+  .badge-offline {
+    @apply badge bg-xpress-text-muted/20 text-xpress-text-muted;
+  }
+
+  .badge-alert {
+    @apply badge bg-xpress-status-alert/20 text-xpress-status-alert;
+  }
+
+  .badge-warning {
+    @apply badge bg-xpress-status-warning/20 text-xpress-status-warning;
+  }
+
+  /* KPI Card */
+  .kpi-card {
+    @apply xpress-card p-4 flex flex-col gap-2;
+  }
+
+  .kpi-value {
+    @apply text-2xl font-bold text-xpress-text-primary;
+  }
+
+  .kpi-label {
+    @apply text-xs text-xpress-text-secondary uppercase tracking-wider;
+  }
+
+  .kpi-trend-up {
+    @apply text-xs text-xpress-status-active flex items-center gap-1;
+  }
+
+  .kpi-trend-down {
+    @apply text-xs text-xpress-status-alert flex items-center gap-1;
+  }
+}
+
+@layer utilities {
+  /* Text utilities */
+  .text-gradient {
+    @apply bg-gradient-to-r from-xpress-accent-blue to-xpress-accent-cyan bg-clip-text text-transparent;
+  }
+
+  /* Animation utilities */
+  .animate-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  /* Focus ring */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-xpress-accent-blue/50 focus:border-xpress-accent-blue;
+  }
+}
+
+/* Mapbox Custom Styles */
+.mapboxgl-map {
+  font-family: inherit;
+}
+
+.mapboxgl-canvas {
+  outline: none;
+}
+
+.mapboxgl-ctrl-group {
+  background: rgba(26, 26, 46, 0.9) !important;
+  border: 1px solid #2a2a45 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.mapboxgl-ctrl-group button {
+  background-color: transparent !important;
+  border-color: #2a2a45 !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+.mapboxgl-ctrl-icon {
+  filter: invert(1);
+}

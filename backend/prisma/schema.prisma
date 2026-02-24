@@ -1,0 +1,847 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  FINANCE
+  AUDITOR
+  OVERWATCH_LEAD
+  OVERWATCH_STAFF
+  DISPATCH_LEAD
+  DISPATCH_STAFF
+  VIEWER
+}
+
+enum ServiceSegment {
+  FOUR_W_TNVS   @map("4W-TNVS")
+  TWO_W_TWG     @map("2W-TWG")
+  TWO_W_SAL     @map("2W-SAL")
+  FOUR_W_SAL    @map("4W-SAL")
+}
+
+enum DriverStatus {
+  ACTIVE
+  SUSPENDED
+  TRAINING
+  PROBATION
+  INACTIVE
+  TERMINATED
+}
+
+enum DriverTier {
+  PLATINUM
+  GOLD
+  SILVER
+  BRONZE
+  UNRANKED
+}
+
+enum ShiftType {
+  AM
+  PM
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  CLOCKED_IN
+  ACTIVE
+  ON_BREAK
+  ENDING
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum TripStatus {
+  REQUESTED
+  ACCEPTED
+  EN_ROUTE_PICKUP
+  ARRIVED_PICKUP
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED_DRIVER
+  CANCELLED_PASSENGER
+  CANCELLED_SYSTEM
+  NO_SHOW_PASSENGER
+}
+
+enum IncidentType {
+  BREAKDOWN
+  SOS
+  ACCIDENT
+  INTEGRITY_ALERT
+  CUSTOMER_COMPLAINT
+  TRAFFIC_VIOLATION
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  PENDING_DOCUMENTATION
+  AUDIT_FAIL
+  RESOLVED
+  ESCALATED
+}
+
+enum ConnectivityStatus {
+  HEALTHY
+  STALE
+  CRITICAL
+  OFFLINE
+}
+
+enum BondTransactionType {
+  DEPOSIT
+  DEDUCTION
+  REFUND
+  ADJUSTMENT
+}
+
+// =============================================================================
+// CUSTOM MODULES ENUMS
+// =============================================================================
+
+enum VehicleType {
+  VAN
+  TRUCK
+  MOTORCYCLE
+}
+
+enum VehicleStatus {
+  ACTIVE
+  IDLE
+  MAINTENANCE
+  OFFLINE
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  ELECTRIC
+  HYBRID
+  LPG
+}
+
+enum CustomIncidentType {
+  ACCIDENT
+  BREAKDOWN
+  COMPLAINT
+  VIOLATION
+}
+
+enum CustomIncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+enum IncidentPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TransactionType {
+  ORDER
+  TOPUP
+  WITHDRAWAL
+  FEE
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+model User {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String    @unique @db.VarChar(255)
+  passwordHash         String    @map("password_hash") @db.VarChar(255)
+  firstName            String    @map("first_name") @db.VarChar(100)
+  lastName             String    @map("last_name") @db.VarChar(100)
+  role                 UserRole
+  phone                String?   @db.VarChar(20)
+  isActive             Boolean   @default(true) @map("is_active")
+  mfaEnabled           Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret            String?   @map("mfa_secret") @db.VarChar(255)
+  maxDriverAllocation  Int       @default(50) @map("max_driver_allocation")
+  currentAllocation    Int       @default(0) @map("current_allocation")
+  lastLoginAt          DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  createdById          String?   @map("created_by") @db.Uuid
+
+  // Relations
+  createdBy            User?     @relation("UserCreatedBy", fields: [createdById], references: [id])
+  createdUsers         User[]    @relation("UserCreatedBy")
+  sessions             UserSession[]
+  assignedDrivers      Driver[]  @relation("DriverOverwatch")
+  assignedIncidents    Incident[] @relation("IncidentAssigned")
+  resolvedIncidents    Incident[] @relation("IncidentResolved")
+  supervisedShifts     Shift[]
+  bondTransactions     BondTransaction[]
+  auditLogs            AuditLog[]
+  costTemplatesCreated AssetCostTemplate[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(255)
+  deviceInfo       Json?     @map("device_info")
+  ipAddress        String?   @map("ip_address") @db.Inet
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@map("user_sessions")
+}
+
+model Driver {
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId            String        @unique @map("employee_id") @db.VarChar(50)
+
+  // Personal
+  firstName             String        @map("first_name") @db.VarChar(100)
+  lastName              String        @map("last_name") @db.VarChar(100)
+  middleName            String?       @map("middle_name") @db.VarChar(100)
+  dateOfBirth           DateTime?     @map("date_of_birth") @db.Date
+  gender                String?       @db.VarChar(20)
+  photoUrl              String?       @map("photo_url") @db.VarChar(500)
+
+  // Contact
+  phonePrimary          String        @map("phone_primary") @db.VarChar(20)
+  phoneSecondary        String?       @map("phone_secondary") @db.VarChar(20)
+  email                 String?       @db.VarChar(255)
+  viberNumber           String?       @map("viber_number") @db.VarChar(20)
+
+  // Address
+  addressLine1          String?       @map("address_line1") @db.VarChar(255)
+  addressLine2          String?       @map("address_line2") @db.VarChar(255)
+  city                  String?       @db.VarChar(100)
+  province              String?       @db.VarChar(100)
+  postalCode            String?       @map("postal_code") @db.VarChar(20)
+
+  // Emergency Contact
+  emergencyName         String?       @map("emergency_name") @db.VarChar(200)
+  emergencyPhone        String?       @map("emergency_phone") @db.VarChar(20)
+  emergencyRelation     String?       @map("emergency_relation") @db.VarChar(50)
+
+  // License & Compliance
+  licenseNumber         String        @map("license_number") @db.VarChar(50)
+  licenseExpiry         DateTime      @map("license_expiry") @db.Date
+  licenseType           String?       @map("license_type") @db.VarChar(20)
+  nbiClearanceDate      DateTime?     @map("nbi_clearance_date") @db.Date
+  drugTestDate          DateTime?     @map("drug_test_date") @db.Date
+
+  // Employment
+  serviceSegment        ServiceSegment @map("service_segment")
+  status                DriverStatus  @default(TRAINING)
+  hireDate              DateTime      @map("hire_date") @db.Date
+  terminationDate       DateTime?     @map("termination_date") @db.Date
+  terminationReason     String?       @map("termination_reason")
+
+  // DXP Program
+  currentTier           DriverTier    @default(UNRANKED) @map("current_tier")
+  tierUpdatedAt         DateTime?     @map("tier_updated_at") @db.Timestamptz
+
+  // Financials
+  securityBondBalance   Decimal       @default(0) @map("security_bond_balance") @db.Decimal(10, 2)
+  securityBondRequired  Decimal       @map("security_bond_required") @db.Decimal(10, 2)
+  baseSalary            Decimal?      @map("base_salary") @db.Decimal(10, 2)
+
+  // Assignment
+  currentAssetId        String?       @map("current_asset_id") @db.Uuid
+  assignedSectorId      String?       @map("assigned_sector_id") @db.Uuid
+  assignedOverwatchId   String?       @map("assigned_overwatch_id") @db.Uuid
+
+  // Audit
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  createdById           String?       @map("created_by") @db.Uuid
+
+  // Relations
+  currentAsset          Asset?        @relation("DriverCurrentAsset", fields: [currentAssetId], references: [id])
+  assignedSector        Geofence?     @relation(fields: [assignedSectorId], references: [id])
+  assignedOverwatch     User?         @relation("DriverOverwatch", fields: [assignedOverwatchId], references: [id])
+  shifts                Shift[]
+  trips                 Trip[]
+  incidents             Incident[]
+  bondTransactions      BondTransaction[]
+  tierHistory           DriverTierHistory[]
+  platformMappings      DriverPlatformMapping[]
+
+  @@index([status])
+  @@index([serviceSegment])
+  @@index([currentTier])
+  @@index([assignedOverwatchId])
+  @@map("drivers")
+}
+
+model DriverTierHistory {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverId           String     @map("driver_id") @db.Uuid
+  previousTier       DriverTier? @map("previous_tier")
+  newTier            DriverTier @map("new_tier")
+  revenue4WeekAvg    Decimal    @map("revenue_4week_avg") @db.Decimal(10, 2)
+  calculationDetails Json?      @map("calculation_details")
+  changedAt          DateTime   @default(now()) @map("changed_at") @db.Timestamptz
+  changedBy          String     @default("SYSTEM") @map("changed_by") @db.VarChar(50)
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId, changedAt(sort: Desc)])
+  @@map("driver_tier_history")
+}
+
+model DriverPlatformMapping {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverId         String   @map("driver_id") @db.Uuid
+  platform         String   @db.VarChar(50)
+  platformDriverId String   @map("platform_driver_id") @db.VarChar(100)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  driver Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, platformDriverId])
+  @@map("driver_platform_mappings")
+}
+
+model Asset {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assetCode        String         @unique @map("asset_code") @db.VarChar(50)
+  plateNumber      String         @unique @map("plate_number") @db.VarChar(20)
+  serviceSegment   ServiceSegment @map("service_segment")
+
+  // Vehicle details
+  make             String?        @db.VarChar(50)
+  model            String?        @db.VarChar(50)
+  year             Int?
+  color            String?        @db.VarChar(30)
+  vin              String?        @db.VarChar(50)
+
+  // Ownership
+  isXpressOwned    Boolean        @default(true) @map("is_xpress_owned")
+  acquisitionDate  DateTime?      @map("acquisition_date") @db.Date
+  acquisitionCost  Decimal?       @map("acquisition_cost") @db.Decimal(12, 2)
+
+  // Equipment
+  hasDashcam       Boolean        @default(true) @map("has_dashcam")
+  dashcamId        String?        @map("dashcam_id") @db.VarChar(100)
+  gpsDeviceId      String?        @map("gps_device_id") @db.VarChar(100)
+
+  // Status
+  isActive         Boolean        @default(true) @map("is_active")
+
+  // Audit
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  currentDrivers   Driver[]       @relation("DriverCurrentAsset")
+  shifts           Shift[]
+  trips            Trip[]
+  incidents        Incident[]
+
+  @@index([serviceSegment])
+  @@map("assets")
+}
+
+model AssetCostTemplate {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String               @db.VarChar(100)
+  serviceSegment ServiceSegment       @map("service_segment")
+  isActive       Boolean              @default(true) @map("is_active")
+  effectiveFrom  DateTime             @map("effective_from") @db.Date
+  effectiveTo    DateTime?            @map("effective_to") @db.Date
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  createdById    String?              @map("created_by") @db.Uuid
+
+  createdBy      User?                @relation(fields: [createdById], references: [id])
+  lineItems      AssetCostLineItem[]
+
+  @@index([serviceSegment, isActive])
+  @@map("asset_cost_templates")
+}
+
+model AssetCostLineItem {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId   String            @map("template_id") @db.Uuid
+  itemName     String            @map("item_name") @db.VarChar(100)
+  dailyAmount  Decimal           @map("daily_amount") @db.Decimal(10, 2)
+  description  String?
+  auditComment String?           @map("audit_comment")
+  sortOrder    Int               @default(0) @map("sort_order")
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  template     AssetCostTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@map("asset_cost_line_items")
+}
+
+model Geofence {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String         @db.VarChar(100)
+  type           String         @db.VarChar(50) // WAREHOUSE, STAGING, SECTOR, HOTSPOT
+  centerLat      Decimal        @map("center_lat") @db.Decimal(10, 7)
+  centerLng      Decimal        @map("center_lng") @db.Decimal(10, 7)
+  radiusMeters   Int            @map("radius_meters")
+  isActive       Boolean        @default(true) @map("is_active")
+  metadata       Json?
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  assignedDrivers  Driver[]
+  shiftsClockIn    Shift[]      @relation("ShiftClockInGeofence")
+  shiftsClockOut   Shift[]      @relation("ShiftClockOutGeofence")
+  shiftsAssigned   Shift[]      @relation("ShiftAssignedSector")
+
+  @@map("geofences")
+}
+
+model Shift {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverId            String       @map("driver_id") @db.Uuid
+  assetId             String       @map("asset_id") @db.Uuid
+
+  // Schedule
+  shiftType           ShiftType    @map("shift_type")
+  shiftDate           DateTime     @map("shift_date") @db.Date
+  scheduledStart      DateTime     @map("scheduled_start") @db.Timestamptz
+  scheduledEnd        DateTime     @map("scheduled_end") @db.Timestamptz
+
+  // Clock In
+  clockInTime         DateTime?    @map("clock_in_time") @db.Timestamptz
+  clockInLat          Decimal?     @map("clock_in_lat") @db.Decimal(10, 7)
+  clockInLng          Decimal?     @map("clock_in_lng") @db.Decimal(10, 7)
+  clockInGeofenceId   String?      @map("clock_in_geofence_id") @db.Uuid
+
+  // Clock Out
+  clockOutTime        DateTime?    @map("clock_out_time") @db.Timestamptz
+  clockOutLat         Decimal?     @map("clock_out_lat") @db.Decimal(10, 7)
+  clockOutLng         Decimal?     @map("clock_out_lng") @db.Decimal(10, 7)
+  clockOutGeofenceId  String?      @map("clock_out_geofence_id") @db.Uuid
+
+  // Status
+  status              ShiftStatus  @default(SCHEDULED)
+
+  // Pre-shift
+  arrivedStagingAt    DateTime?    @map("arrived_staging_at") @db.Timestamptz
+  preShiftChecklist   Json?        @map("pre_shift_checklist")
+  assignedSectorId    String?      @map("assigned_sector_id") @db.Uuid
+
+  // Metrics
+  totalRevenue        Decimal      @default(0) @map("total_revenue") @db.Decimal(10, 2)
+  tripCount           Int          @default(0) @map("trip_count")
+  cancellationCount   Int          @default(0) @map("cancellation_count")
+  onlineMinutes       Int          @default(0) @map("online_minutes")
+  utilizedMinutes     Int          @default(0) @map("utilized_minutes")
+
+  // Financials
+  driverEarnings      Decimal      @default(0) @map("driver_earnings") @db.Decimal(10, 2)
+  assetCost           Decimal      @default(0) @map("asset_cost") @db.Decimal(10, 2)
+  netMargin           Decimal      @default(0) @map("net_margin") @db.Decimal(10, 2)
+
+  // Flags
+  hasIncident         Boolean      @default(false) @map("has_incident")
+  underWorkingFlag    Boolean      @default(false) @map("under_working_flag")
+  lateArrivalFlag     Boolean      @default(false) @map("late_arrival_flag")
+  geoViolationFlag    Boolean      @default(false) @map("geo_violation_flag")
+
+  // Post-shift
+  postShiftNotes      String?      @map("post_shift_notes")
+  supervisorId        String?      @map("supervisor_id") @db.Uuid
+
+  // Audit
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  driver              Driver       @relation(fields: [driverId], references: [id])
+  asset               Asset        @relation(fields: [assetId], references: [id])
+  clockInGeofence     Geofence?    @relation("ShiftClockInGeofence", fields: [clockInGeofenceId], references: [id])
+  clockOutGeofence    Geofence?    @relation("ShiftClockOutGeofence", fields: [clockOutGeofenceId], references: [id])
+  assignedSector      Geofence?    @relation("ShiftAssignedSector", fields: [assignedSectorId], references: [id])
+  supervisor          User?        @relation(fields: [supervisorId], references: [id])
+  trips               Trip[]
+  incidents           Incident[]
+
+  @@unique([driverId, shiftDate, shiftType])
+  @@index([driverId, shiftDate])
+  @@index([status])
+  @@index([shiftDate])
+  @@map("shifts")
+}
+
+model Trip {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  externalTripId     String?    @unique @map("external_trip_id") @db.VarChar(100)
+  shiftId            String?    @map("shift_id") @db.Uuid
+  driverId           String     @map("driver_id") @db.Uuid
+  assetId            String     @map("asset_id") @db.Uuid
+
+  // Trip details
+  serviceSegment     ServiceSegment @map("service_segment")
+  status             TripStatus
+
+  // Times
+  requestedAt        DateTime   @map("requested_at") @db.Timestamptz
+  acceptedAt         DateTime?  @map("accepted_at") @db.Timestamptz
+  pickupArrivedAt    DateTime?  @map("pickup_arrived_at") @db.Timestamptz
+  tripStartedAt      DateTime?  @map("trip_started_at") @db.Timestamptz
+  tripEndedAt        DateTime?  @map("trip_ended_at") @db.Timestamptz
+  cancelledAt        DateTime?  @map("cancelled_at") @db.Timestamptz
+
+  // Locations
+  pickupLat          Decimal?   @map("pickup_lat") @db.Decimal(10, 7)
+  pickupLng          Decimal?   @map("pickup_lng") @db.Decimal(10, 7)
+  pickupAddress      String?    @map("pickup_address") @db.VarChar(500)
+  dropoffLat         Decimal?   @map("dropoff_lat") @db.Decimal(10, 7)
+  dropoffLng         Decimal?   @map("dropoff_lng") @db.Decimal(10, 7)
+  dropoffAddress     String?    @map("dropoff_address") @db.VarChar(500)
+
+  // Distance & Duration
+  estimatedDistanceKm Decimal?  @map("estimated_distance_km") @db.Decimal(8, 2)
+  actualDistanceKm    Decimal?  @map("actual_distance_km") @db.Decimal(8, 2)
+  estimatedDurationMin Int?     @map("estimated_duration_min")
+  actualDurationMin    Int?     @map("actual_duration_min")
+
+  // Financials
+  fareAmount         Decimal?   @map("fare_amount") @db.Decimal(10, 2)
+  platformFee        Decimal?   @map("platform_fee") @db.Decimal(10, 2)
+  driverCommission   Decimal?   @map("driver_commission") @db.Decimal(10, 2)
+  tipAmount          Decimal?   @map("tip_amount") @db.Decimal(10, 2)
+  totalRevenue       Decimal?   @map("total_revenue") @db.Decimal(10, 2)
+
+  // Cancellation
+  cancellationReason String?    @map("cancellation_reason") @db.VarChar(255)
+  cancellationFee    Decimal?   @map("cancellation_fee") @db.Decimal(10, 2)
+
+  // Ratings
+  passengerRating    Decimal?   @map("passenger_rating") @db.Decimal(2, 1)
+  driverRating       Decimal?   @map("driver_rating") @db.Decimal(2, 1)
+
+  // Audit
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  shift              Shift?     @relation(fields: [shiftId], references: [id])
+  driver             Driver     @relation(fields: [driverId], references: [id])
+  asset              Asset      @relation(fields: [assetId], references: [id])
+  incidents          Incident[]
+
+  @@index([shiftId])
+  @@index([driverId, requestedAt])
+  @@map("trips")
+}
+
+model Incident {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentNumber      String          @unique @map("incident_number") @db.VarChar(50)
+
+  // Context
+  driverId            String          @map("driver_id") @db.Uuid
+  shiftId             String?         @map("shift_id") @db.Uuid
+  tripId              String?         @map("trip_id") @db.Uuid
+  assetId             String?         @map("asset_id") @db.Uuid
+
+  // Classification
+  incidentType        IncidentType    @map("incident_type")
+  status              IncidentStatus  @default(OPEN)
+  severity            Int             @default(3)
+
+  // Details
+  occurredAt          DateTime        @map("occurred_at") @db.Timestamptz
+  reportedAt          DateTime        @default(now()) @map("reported_at") @db.Timestamptz
+  locationLat         Decimal?        @map("location_lat") @db.Decimal(10, 7)
+  locationLng         Decimal?        @map("location_lng") @db.Decimal(10, 7)
+  locationAddress     String?         @map("location_address") @db.VarChar(500)
+  description         String
+
+  // Third party (for accidents)
+  thirdPartyName      String?         @map("third_party_name") @db.VarChar(200)
+  thirdPartyContact   String?         @map("third_party_contact") @db.VarChar(100)
+  thirdPartyPlate     String?         @map("third_party_plate") @db.VarChar(20)
+  thirdPartyInsurance String?         @map("third_party_insurance") @db.VarChar(200)
+
+  // Integrity alerts
+  gpsVelocityKph      Decimal?        @map("gps_velocity_kph") @db.Decimal(5, 1)
+  dashcamStatus       String?         @map("dashcam_status") @db.VarChar(50)
+  sabotageConfirmed   Boolean         @default(false) @map("sabotage_confirmed")
+
+  // Evidence
+  photoUrls           String[]        @map("photo_urls")
+  dashcamFootageUrl   String?         @map("dashcam_footage_url") @db.VarChar(500)
+
+  // Financial impact
+  deductibleAmount    Decimal         @default(0) @map("deductible_amount") @db.Decimal(10, 2)
+  repairLiability     Boolean         @default(false) @map("repair_liability")
+  bonusForfeiture     Boolean         @default(false) @map("bonus_forfeiture")
+
+  // Resolution
+  resolutionNotes     String?         @map("resolution_notes")
+  resolvedAt          DateTime?       @map("resolved_at") @db.Timestamptz
+  resolvedById        String?         @map("resolved_by") @db.Uuid
+
+  // Assignment
+  assignedToId        String?         @map("assigned_to") @db.Uuid
+  escalatedToId       String?         @map("escalated_to") @db.Uuid
+
+  // SLA
+  slaDueAt            DateTime?       @map("sla_due_at") @db.Timestamptz
+  slaBreached         Boolean         @default(false) @map("sla_breached")
+
+  // Audit
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  createdById         String?         @map("created_by") @db.Uuid
+  source              String          @default("SYSTEM") @db.VarChar(50)
+
+  // Relations
+  driver              Driver          @relation(fields: [driverId], references: [id])
+  shift               Shift?          @relation(fields: [shiftId], references: [id])
+  trip                Trip?           @relation(fields: [tripId], references: [id])
+  asset               Asset?          @relation(fields: [assetId], references: [id])
+  assignedTo          User?           @relation("IncidentAssigned", fields: [assignedToId], references: [id])
+  resolvedBy          User?           @relation("IncidentResolved", fields: [resolvedById], references: [id])
+  activities          IncidentActivity[]
+
+  @@index([status])
+  @@index([driverId])
+  @@index([assignedToId])
+  @@map("incidents")
+}
+
+model IncidentActivity {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentId   String   @map("incident_id") @db.Uuid
+  activityType String   @map("activity_type") @db.VarChar(50)
+  description  String?
+  oldValue     String?  @map("old_value")
+  newValue     String?  @map("new_value")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdById  String?  @map("created_by") @db.Uuid
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([incidentId])
+  @@map("incident_activities")
+}
+
+model BondTransaction {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driverId        String              @map("driver_id") @db.Uuid
+  transactionType BondTransactionType @map("transaction_type")
+  amount          Decimal             @db.Decimal(10, 2)
+  balanceAfter    Decimal             @map("balance_after") @db.Decimal(10, 2)
+  referenceType   String?             @map("reference_type") @db.VarChar(50)
+  referenceId     String?             @map("reference_id") @db.Uuid
+  description     String?
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  createdById     String?             @map("created_by") @db.Uuid
+
+  driver    Driver @relation(fields: [driverId], references: [id])
+  createdBy User?  @relation(fields: [createdById], references: [id])
+
+  @@index([driverId, createdAt(sort: Desc)])
+  @@map("bond_transactions")
+}
+
+model TierThreshold {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serviceSegment     ServiceSegment @map("service_segment")
+  tier               DriverTier
+  minRevenuePerHour  Decimal        @map("min_revenue_per_hour") @db.Decimal(10, 2)
+  effectiveFrom      DateTime       @map("effective_from") @db.Date
+  effectiveTo        DateTime?      @map("effective_to") @db.Date
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([serviceSegment, tier, effectiveFrom])
+  @@map("tier_thresholds")
+}
+
+model ShiftConfig {
+  id                         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serviceSegment             ServiceSegment @map("service_segment")
+  shiftType                  ShiftType      @map("shift_type")
+  durationHours              Int            @map("duration_hours")
+  startTime                  String         @map("start_time") @db.VarChar(5)
+  endTime                    String         @map("end_time") @db.VarChar(5)
+  stagingMinutes             Int            @default(20) @map("staging_minutes")
+  targetRevenuePerHour       Decimal?       @map("target_revenue_per_hour") @db.Decimal(10, 2)
+  cancellationThresholdPct   Decimal        @default(3.0) @map("cancellation_threshold_pct") @db.Decimal(5, 2)
+  underWorkingThresholdPct   Decimal        @default(10.0) @map("under_working_threshold_pct") @db.Decimal(5, 2)
+  effectiveFrom              DateTime       @map("effective_from") @db.Date
+  effectiveTo                DateTime?      @map("effective_to") @db.Date
+  createdAt                  DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("shift_configs")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  entityType String   @map("entity_type") @db.VarChar(100)
+  entityId   String?  @map("entity_id") @db.Uuid
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address") @db.Inet
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("audit_log")
+}
+
+model SystemConfig {
+  key         String   @id @db.VarChar(100)
+  value       Json
+  description String?
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("system_config")
+}
+
+// =============================================================================
+// CUSTOM MODULES MODELS
+// =============================================================================
+
+// Fleet Module - Vehicle Model
+model Vehicle {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  plateNumber          String        @unique @map("plate_number") @db.VarChar(20)
+  make                 String        @db.VarChar(50)
+  model                String        @db.VarChar(50)
+  year                 Int
+  type                 VehicleType
+  status               VehicleStatus @default(IDLE)
+  capacityPassengers   Int           @map("capacity_passengers")
+  capacityCargo        Decimal       @map("capacity_cargo") @db.Decimal(10, 2)
+  fuelType             FuelType      @map("fuel_type")
+  
+  // Current Location
+  currentLat           Decimal?      @map("current_lat") @db.Decimal(10, 7)
+  currentLng           Decimal?      @map("current_lng") @db.Decimal(10, 7)
+  currentAddress       String?       @map("current_address") @db.VarChar(500)
+  
+  // Assignment
+  assignedDriverId     String?       @map("assigned_driver_id") @db.Uuid
+  
+  // Metrics
+  mileage              Decimal       @default(0) @db.Decimal(12, 2)
+  fuelLevel            Decimal       @default(100) @map("fuel_level") @db.Decimal(5, 2)
+  
+  // Maintenance
+  lastMaintenanceDate  DateTime?     @map("last_maintenance_date") @db.Date
+  nextMaintenanceDate  DateTime?     @map("next_maintenance_date") @db.Date
+  
+  // Audit
+  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([type])
+  @@index([assignedDriverId])
+  @@map("vehicles")
+}
+
+// Incidents Module - Custom Incident Model
+model CustomIncident {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentNumber   String               @unique @map("incident_number") @db.VarChar(50)
+  type             CustomIncidentType
+  status           CustomIncidentStatus @default(OPEN)
+  priority         IncidentPriority     @default(MEDIUM)
+  
+  // Context
+  driverId         String               @map("driver_id") @db.Uuid
+  vehicleId        String?              @map("vehicle_id") @db.Uuid
+  orderId          String?              @map("order_id") @db.Uuid
+  
+  // Details
+  description      String
+  locationLat      Decimal?             @map("location_lat") @db.Decimal(10, 7)
+  locationLng      Decimal?             @map("location_lng") @db.Decimal(10, 7)
+  locationAddress  String?              @map("location_address") @db.VarChar(500)
+  
+  // Reporting
+  reportedAt       DateTime             @default(now()) @map("reported_at") @db.Timestamptz
+  reportedBy       String               @map("reported_by") @db.VarChar(100)
+  
+  // Assignment & Resolution
+  assignedTo       String?              @map("assigned_to") @db.Uuid
+  resolutionNotes  String?              @map("resolution_notes")
+  
+  // Audit
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([priority])
+  @@index([driverId])
+  @@index([type])
+  @@map("custom_incidents")
+}
+
+// Finance Module - Transaction Model
+model Transaction {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transactionNumber String            @unique @map("transaction_number") @db.VarChar(50)
+  type              TransactionType
+  status            TransactionStatus @default(PENDING)
+  
+  // Financial
+  amount            Decimal           @db.Decimal(12, 2)
+  currency          String            @default("PHP") @db.VarChar(3)
+  description       String?
+  
+  // Context
+  driverId          String            @map("driver_id") @db.Uuid
+  orderId           String?           @map("order_id") @db.Uuid
+  
+  // Additional data
+  metadata          Json?
+  
+  // Timestamps
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  processedAt       DateTime?         @map("processed_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([type])
+  @@index([driverId])
+  @@index([createdAt])
+  @@map("transactions")
+}

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simple Login Test</title>
+  <style>
+    body { font-family: sans-serif; max-width: 400px; margin: 50px auto; padding: 20px; }
+    input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; }
+    button { background: #0066cc; color: white; border: none; cursor: pointer; }
+    button:hover { background: #0055aa; }
+    #result { margin-top: 20px; padding: 10px; background: #f0f0f0; white-space: pre-wrap; }
+    .error { color: red; }
+    .success { color: green; }
+  </style>
+</head>
+<body>
+  <h1>Direct Login Test</h1>
+  <p>Testing backend at: <code>http://localhost:8001</code></p>
+  
+  <form id="loginForm">
+    <input type="email" id="email" value="admin@opstower.com" placeholder="Email" required>
+    <input type="password" id="password" value="admin123" placeholder="Password" required>
+    <button type="submit">Sign In (Direct Fetch)</button>
+  </form>
+  
+  <div id="result"></div>
+
+  <script>
+    const result = document.getElementById('result');
+    
+    function log(msg, isError = false) {
+      console.log(msg);
+      result.innerHTML += (isError ? '<span class="error">' : '') + msg + '\n' + (isError ? '</span>' : '');
+    }
+    
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      result.innerHTML = '';
+      log('=== Starting Login Test ===');
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      log(`Email: ${email}`);
+      
+      try {
+        const url = 'http://localhost:8001/api/auth/login';
+        log(`Calling: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        log(`Response status: ${response.status}`);
+        
+        const data = await response.json();
+        log(`Response data: ${JSON.stringify(data, null, 2)}`);
+        
+        if (response.ok) {
+          result.innerHTML += '<span class="success">\n✅ LOGIN SUCCESS!\n</span>';
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          log('Token stored in localStorage');
+          
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
+        } else {
+          result.innerHTML += `<span class="error">\n❌ LOGIN FAILED: ${data.message || data.error}\n</span>`;
+        }
+        
+      } catch (err) {
+        log(`ERROR: ${err.message}`, true);
+        result.innerHTML += `<span class="error">\n❌ NETWORK ERROR: ${err.message}\n</span>`;
+      }
+    });
+    
+    log('Page loaded. Ready to test.');
+  </script>
+</body>
+</html>

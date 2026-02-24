@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; }
+    input, button { padding: 10px; margin: 5px; font-size: 16px; }
+    #result { margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 5px; }
+    .error { color: red; }
+    .success { color: green; }
+  </style>
+</head>
+<body>
+  <h1>OpsTower Login Test</h1>
+  <p>Backend: <code>http://localhost:8001</code></p>
+  
+  <div>
+    <input type="email" id="email" placeholder="Email" value="admin@opstower.com"><br>
+    <input type="password" id="password" placeholder="Password" value="admin123"><br>
+    <button onclick="login()">Login</button>
+  </div>
+  
+  <div id="result"></div>
+
+  <script>
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const resultDiv = document.getElementById('result');
+      
+      resultDiv.innerHTML = 'Testing connection to http://localhost:8001/api/auth/login...';
+      
+      try {
+        const response = await fetch('http://localhost:8001/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          resultDiv.innerHTML = `
+            <div class="success">
+              <h3>✅ Login Successful!</h3>
+              <p>User: ${data.user.email}</p>
+              <p>Role: ${data.user.role}</p>
+              <p>Token: ${data.token.substring(0, 50)}...</p>
+            </div>
+          `;
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+        } else {
+          resultDiv.innerHTML = `
+            <div class="error">
+              <h3>❌ Login Failed</h3>
+              <p>Status: ${response.status}</p>
+              <p>Error: ${JSON.stringify(data)}</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `
+          <div class="error">
+            <h3>❌ Connection Error</h3>
+            <p>${error.message}</p>
+            <p>Make sure backend is running on port 8001</p>
+          </div>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>

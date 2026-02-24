@@ -1,0 +1,222 @@
+name: Deploy Backend to Azure
+
+on:
+  push:
+    branches:
+      - main
+      - feature/port-all-features
+    paths:
+      - 'backend/**'
+      - 'infrastructure/azure/**'
+      - '.github/workflows/deploy-azure.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AZURE_RESOURCE_GROUP: opstower-v2-rg
+  AZURE_LOCATION: southeastasia
+  BACKEND_IMAGE_NAME: opstower-backend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.image-tag.outputs.tag }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Get ACR credentials
+      id: acr
+      run: |
+        ACR_NAME=$(az acr list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[0].name" -o tsv)
+        ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query loginServer -o tsv)
+        echo "name=$ACR_NAME" >> $GITHUB_OUTPUT
+        echo "login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
+
+    - name: Login to ACR
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ steps.acr.outputs.login_server }}
+        username: ${{ steps.acr.outputs.name }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Generate image tag
+      id: image-tag
+      run: |
+        TAG=sha-$(git rev-parse --short HEAD)
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "Image tag: $TAG"
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        file: ./backend/Dockerfile
+        push: true
+        tags: |
+          ${{ steps.acr.outputs.login_server }}/${{ env.BACKEND_IMAGE_NAME }}:${{ steps.image-tag.outputs.tag }}
+          ${{ steps.acr.outputs.login_server }}/${{ env.BACKEND_IMAGE_NAME }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Create Resource Group
+      run: |
+        az group create \
+          --name ${{ env.AZURE_RESOURCE_GROUP }} \
+          --location ${{ env.AZURE_LOCATION }} \
+          --tags environment=${{ github.event.inputs.environment || 'prod' }} application=opstower
+
+    - name: Deploy Bicep template
+      uses: azure/arm-deploy@v2
+      with:
+        subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+        template: ./infrastructure/azure/main.bicep
+        parameters: |
+          {
+            "appName": "opstower-v2",
+            "environment": "${{ github.event.inputs.environment || 'prod' }}",
+            "postgresAdminPassword": "${{ secrets.POSTGRES_ADMIN_PASSWORD }}",
+            "jwtSecret": "${{ secrets.JWT_SECRET }}",
+            "usePlaceholderImage": false,
+            "imageTag": "${{ needs.build-and-push.outputs.image_tag }}"
+          }
+        failOnStdErr: false
+
+  run-migrations:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-infrastructure]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Get PostgreSQL connection details
+      id: postgres
+      run: |
+        PG_FQDN=$(az postgres flexible-server list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[0].fullyQualifiedDomainName" -o tsv)
+        echo "fqdn=$PG_FQDN" >> $GITHUB_OUTPUT
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: ./backend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Run Prisma db push
+      working-directory: ./backend
+      env:
+        DATABASE_URL: postgresql://opstoweradmin:${{ secrets.POSTGRES_ADMIN_PASSWORD }}@${{ steps.postgres.outputs.fqdn }}:5432/opstower?sslmode=require
+      run: |
+        echo "Checking for migrations..."
+        if [ -d "prisma/migrations" ] && [ "$(ls -A prisma/migrations)" ]; then
+          echo "Running migrate deploy..."
+          npx prisma migrate deploy
+        else
+          echo "No migrations found. Running db push..."
+          npx prisma db push --accept-data-loss
+        fi
+
+  deploy-container-app:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-infrastructure, run-migrations]
+    
+    steps:
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Update Container App
+      run: |
+        ACR_NAME=$(az acr list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[0].name" -o tsv)
+        ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query loginServer -o tsv)
+        CONTAINER_APP_NAME=$(az containerapp list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[?contains(name, 'backend')].name" -o tsv)
+        
+        az containerapp update \
+          --name $CONTAINER_APP_NAME \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --image $ACR_LOGIN_SERVER/${{ env.BACKEND_IMAGE_NAME }}:${{ needs.build-and-push.outputs.image_tag }}
+
+    - name: Verify deployment
+      run: |
+        CONTAINER_APP_NAME=$(az containerapp list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[?contains(name, 'backend')].name" -o tsv)
+        az containerapp show --name $CONTAINER_APP_NAME --resource-group ${{ env.AZURE_RESOURCE_GROUP }}
+
+    - name: Get application URL
+      id: app-url
+      run: |
+        CONTAINER_APP_NAME=$(az containerapp list --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query "[?contains(name, 'backend')].name" -o tsv)
+        APP_URL=$(az containerapp show --name $CONTAINER_APP_NAME --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --query properties.configuration.ingress.fqdn -o tsv)
+        echo "url=https://$APP_URL" >> $GITHUB_OUTPUT
+        echo "Application URL: https://$APP_URL"
+
+    - name: Health check
+      run: |
+        sleep 30
+        APP_URL=$(echo "${{ steps.app-url.outputs.url }}" | sed 's|https://||')
+        curl -sf https://$APP_URL/health || (echo "Health check failed!" && exit 1)
+
+    - name: Comment deployment URL
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '🚀 Backend deployed to Azure: ${{ steps.app-url.outputs.url }}'
+          })
+
+    - name: Update deployment status
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const outcome = '${{ job.status }}';
+          const url = '${{ steps.app-url.outputs.url }}' || 'N/A';
+          console.log(`Deployment ${outcome}: ${url}`);

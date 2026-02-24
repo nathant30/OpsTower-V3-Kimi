@@ -1,0 +1,1 @@
+export { PassengerTable } from './PassengerTable';

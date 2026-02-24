@@ -1,0 +1,278 @@
+{
+  "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/main",
+  "location": null,
+  "name": "main",
+  "properties": {
+    "correlationId": "49230f44-22dd-491e-8704-ce8093fe8dfe",
+    "debugSetting": null,
+    "dependencies": [
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/logAnalytics",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "logAnalytics",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "apiVersion": "2025-04-01",
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/logAnalytics",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "logAnalytics",
+            "resourceType": "Microsoft.Resources/deployments"
+          }
+        ],
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/appInsights",
+        "resourceGroup": "opstower-v2-rg",
+        "resourceName": "appInsights",
+        "resourceType": "Microsoft.Resources/deployments"
+      },
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/logAnalytics",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "logAnalytics",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "apiVersion": "2025-04-01",
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/logAnalytics",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "logAnalytics",
+            "resourceType": "Microsoft.Resources/deployments"
+          }
+        ],
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/containerAppEnv",
+        "resourceGroup": "opstower-v2-rg",
+        "resourceName": "containerAppEnv",
+        "resourceType": "Microsoft.Resources/deployments"
+      },
+      {
+        "dependsOn": [
+          {
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/acr",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "acr",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/appInsights",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "appInsights",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/containerAppEnv",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "containerAppEnv",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/postgres",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "postgres",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "apiVersion": "2025-04-01",
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/containerAppEnv",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "containerAppEnv",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "apiVersion": "2025-04-01",
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/acr",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "acr",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "apiVersion": "2025-04-01",
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/postgres",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "postgres",
+            "resourceType": "Microsoft.Resources/deployments"
+          },
+          {
+            "apiVersion": "2025-04-01",
+            "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/appInsights",
+            "resourceGroup": "opstower-v2-rg",
+            "resourceName": "appInsights",
+            "resourceType": "Microsoft.Resources/deployments"
+          }
+        ],
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Resources/deployments/backendApp",
+        "resourceGroup": "opstower-v2-rg",
+        "resourceName": "backendApp",
+        "resourceType": "Microsoft.Resources/deployments"
+      }
+    ],
+    "diagnostics": null,
+    "duration": "PT2M37.909977S",
+    "error": null,
+    "extensions": [],
+    "mode": "Incremental",
+    "onErrorDeployment": null,
+    "outputResources": [
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.App/containerApps/opstower-v2-prod-backend",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.App/containerApps"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.App/managedEnvironments/opstower-v2-prod-env",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.App/managedEnvironments"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.ContainerRegistry/registries/opstowerv2acrdno7fxcd3p4ig",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.ContainerRegistry/registries"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/opstower-v2-prod-postgres",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.DBforPostgreSQL/flexibleServers"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/opstower-v2-prod-postgres/databases/opstower",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.DBforPostgreSQL/flexibleServers/databases"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/opstower-v2-prod-postgres/firewallRules/AllowAllAzureServices",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.Insights/components/opstower-v2-prod-insights",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.Insights/components"
+      },
+      {
+        "apiVersion": null,
+        "extension": null,
+        "id": "/subscriptions/040fe334-ee94-4f5a-a20e-48c1647febfe/resourceGroups/opstower-v2-rg/providers/Microsoft.OperationalInsights/workspaces/opstower-v2-prod-logs",
+        "identifiers": null,
+        "resourceGroup": "opstower-v2-rg",
+        "resourceType": "Microsoft.OperationalInsights/workspaces"
+      }
+    ],
+    "outputs": {
+      "acrLoginServer": {
+        "type": "String",
+        "value": "opstowerv2acrdno7fxcd3p4ig.azurecr.io"
+      },
+      "acrName": {
+        "type": "String",
+        "value": "opstowerv2acrdno7fxcd3p4ig"
+      },
+      "appInsightsName": {
+        "type": "String",
+        "value": "opstower-v2-prod-insights"
+      },
+      "backendUrl": {
+        "type": "String",
+        "value": "https://opstower-v2-prod-backend.livelyhill-909038e4.southeastasia.azurecontainerapps.io"
+      },
+      "postgresFqdn": {
+        "type": "String",
+        "value": "opstower-v2-prod-postgres.postgres.database.azure.com"
+      }
+    },
+    "parameters": {
+      "appName": {
+        "type": "String",
+        "value": "opstower-v2"
+      },
+      "environment": {
+        "type": "String",
+        "value": "prod"
+      },
+      "imageTag": {
+        "type": "String",
+        "value": "latest"
+      },
+      "jwtSecret": {
+        "type": "SecureString"
+      },
+      "location": {
+        "type": "String",
+        "value": "southeastasia"
+      },
+      "logLevel": {
+        "type": "String",
+        "value": "info"
+      },
+      "postgresAdminPassword": {
+        "type": "SecureString"
+      },
+      "postgresAdminUsername": {
+        "type": "String",
+        "value": "opstoweradmin"
+      },
+      "usePlaceholderImage": {
+        "type": "Bool",
+        "value": true
+      }
+    },
+    "parametersLink": null,
+    "providers": [
+      {
+        "id": null,
+        "namespace": "Microsoft.Resources",
+        "providerAuthorizationConsentState": null,
+        "registrationPolicy": null,
+        "registrationState": null,
+        "resourceTypes": [
+          {
+            "aliases": null,
+            "apiProfiles": null,
+            "apiVersions": null,
+            "capabilities": null,
+            "defaultApiVersion": null,
+            "locationMappings": null,
+            "locations": [
+              null
+            ],
+            "properties": null,
+            "resourceType": "deployments",
+            "zoneMappings": null
+          }
+        ]
+      }
+    ],
+    "provisioningState": "Succeeded",
+    "templateHash": "14695718968694181163",
+    "templateLink": null,
+    "timestamp": "2026-02-23T23:29:12.404711+00:00",
+    "validatedResources": null,
+    "validationLevel": null
+  },
+  "resourceGroup": "opstower-v2-rg",
+  "tags": null,
+  "type": "Microsoft.Resources/deployments"
+}

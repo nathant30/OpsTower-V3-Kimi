@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Debug Login</title>
+  <style>
+    body { font-family: monospace; max-width: 800px; margin: 20px auto; padding: 20px; }
+    #log { background: #f5f5f5; padding: 15px; white-space: pre-wrap; border: 1px solid #ddd; min-height: 300px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 5px; }
+    .error { color: red; }
+    .success { color: green; }
+    .info { color: blue; }
+  </style>
+</head>
+<body>
+  <h1>Login Diagnostics</h1>
+  <p>This page tests the login with detailed error logging.</p>
+  
+  <button onclick="test1()">Test 1: Simple Fetch</button>
+  <button onclick="test2()">Test 2: With Mode/Credentials</button>
+  <button onclick="test3()">Test 3: Full React-style</button>
+  <button onclick="clearLog()">Clear Log</button>
+  
+  <div id="log"></div>
+
+  <script>
+    const log = document.getElementById('log');
+    
+    function add(msg, cls = '') {
+      const time = new Date().toLocaleTimeString();
+      log.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
+      console.log(msg);
+    }
+    
+    function clearLog() {
+      log.innerHTML = '';
+    }
+    
+    async function test1() {
+      add('=== Test 1: Simplest possible fetch ===', 'info');
+      try {
+        const response = await fetch('http://localhost:8001/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@opstower.com', password: 'admin123' })
+        });
+        add(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+        const data = await response.json();
+        add(`Response: ${JSON.stringify(data, null, 2)}`);
+      } catch (err) {
+        add(`ERROR: ${err.name}: ${err.message}`, 'error');
+        add(`Stack: ${err.stack}`, 'error');
+      }
+    }
+    
+    async function test2() {
+      add('=== Test 2: With mode and credentials ===', 'info');
+      try {
+        const response = await fetch('http://localhost:8001/api/auth/login', {
+          method: 'POST',
+          mode: 'cors',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@opstower.com', password: 'admin123' })
+        });
+        add(`Status: ${response.status}`, response.ok ? 'success' : 'error');
+        const data = await response.json();
+        add(`User: ${data.user?.email}`, 'success');
+      } catch (err) {
+        add(`ERROR: ${err.name}: ${err.message}`, 'error');
+      }
+    }
+    
+    async function test3() {
+      add('=== Test 3: Full React simulation ===', 'info');
+      try {
+        const url = new URL('/api/auth/login', 'http://localhost:8001');
+        add(`URL: ${url.toString()}`);
+        
+        const response = await fetch(url.toString(), {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ email: 'admin@opstower.com', password: 'admin123' })
+        });
+        
+        add(`Response ok: ${response.ok}`);
+        add(`Status: ${response.status}`);
+        
+        if (!response.ok) {
+          const errText = await response.text();
+          add(`Error body: ${errText}`, 'error');
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        add(`SUCCESS! Token received: ${data.token?.substring(0, 30)}...`, 'success');
+        
+        localStorage.setItem('token', data.token);
+        add('Token saved to localStorage');
+        
+      } catch (err) {
+        add(`CATCH ERROR: ${err.message}`, 'error');
+        add(`Error type: ${err.constructor.name}`, 'error');
+      }
+    }
+    
+    add('Ready. Click a test button above.', 'info');
+  </script>
+</body>
+</html>
