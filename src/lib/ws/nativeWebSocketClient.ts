@@ -1,7 +1,7 @@
 /**
  * Native WebSocket Client
  * Compatible wrapper replacing SignalR for our custom backend
- * URL: wss://backend-domain.com/ws/realtime
+ * URL: wss://opstower-v2-prod-backend.livelyhill-909038e4.southeastasia.azurecontainerapps.io/ws/realtime
  */
 
 import { SIGNALR_CONFIG } from '@/config/api.config';
@@ -30,6 +30,14 @@ interface HubMessage {
   timestamp?: string;
 }
 
+// Backend message types
+export type BackendMessageType = 
+  | 'connected' 
+  | 'driver-location' 
+  | 'new-order' 
+  | 'incident-created'
+  | 'pong';
+
 /**
  * Native WebSocket Client Singleton
  * Replaces SignalR with our custom WebSocket backend
@@ -44,6 +52,7 @@ class NativeWebSocketClient {
   private connectionStartTime: number | null = null;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Get current connection status
@@ -117,6 +126,7 @@ class NativeWebSocketClient {
         this.connectionStartTime = Date.now();
         this.setStatus('connected');
         this.reconnectAttempts = 0;
+        this.startPingInterval();
         showInfo('Real-time connection established', 3000);
       };
 
@@ -135,6 +145,7 @@ class NativeWebSocketClient {
 
       this.socket.onclose = () => {
         console.warn('[WebSocket] Connection closed');
+        this.stopPingInterval();
         this.setStatus('disconnected');
         
         if (this.connectionStartTime) {
@@ -153,18 +164,86 @@ class NativeWebSocketClient {
 
   /**
    * Handle incoming WebSocket messages
+   * Maps backend message types to frontend event names
    */
   private handleMessage(message: HubMessage): void {
+    console.log('[WebSocket] Received:', message.type, message.payload);
+    
     switch (message.type) {
       case 'connected':
         console.log('[WebSocket] Server acknowledged connection:', message);
         break;
-      case 'pong':
-        // Ping/pong handling
+        
+      case 'driver-location':
+        // Map to driver.location.updated event
+        this.emit('driver.location.updated', {
+          driverId: message.payload?.driverId,
+          lat: message.payload?.lat,
+          lng: message.payload?.lng,
+          heading: message.payload?.heading,
+          speed: message.payload?.speed,
+          timestamp: message.payload?.timestamp || new Date().toISOString(),
+        });
+        // Also emit driver.status.changed if status is included
+        if (message.payload?.status) {
+          this.emit('driver.status.changed', {
+            driverId: message.payload?.driverId,
+            status: message.payload?.status,
+            previousStatus: message.payload?.previousStatus,
+            timestamp: message.payload?.timestamp || new Date().toISOString(),
+          });
+        }
         break;
+        
+      case 'new-order':
+        // Map to order.created event
+        this.emit('order.created', {
+          orderId: message.payload?.orderId,
+          data: message.payload,
+          timestamp: message.payload?.timestamp || new Date().toISOString(),
+        });
+        break;
+        
+      case 'incident-created':
+        // Map to incident.created event
+        this.emit('incident.created', {
+          incidentId: message.payload?.incidentId,
+          type: message.payload?.type,
+          severity: message.payload?.severity,
+          reportedBy: message.payload?.reportedBy,
+          timestamp: message.payload?.timestamp || new Date().toISOString(),
+        });
+        break;
+        
+      case 'pong':
+        // Ping/pong handling - connection is alive
+        break;
+        
       default:
-        // Emit to subscribers
+        // Emit to subscribers for any other message types
         this.emit(message.type, message.payload);
+    }
+  }
+
+  /**
+   * Start ping interval to keep connection alive
+   */
+  private startPingInterval(): void {
+    this.stopPingInterval();
+    this.pingInterval = setInterval(() => {
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.send('ping', {});
+      }
+    }, 30000); // Ping every 30 seconds
+  }
+
+  /**
+   * Stop ping interval
+   */
+  private stopPingInterval(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
     }
   }
 
@@ -197,6 +276,8 @@ class NativeWebSocketClient {
    * Disconnect WebSocket
    */
   disconnect(): Promise<void> {
+    this.stopPingInterval();
+    
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

@@ -1,14 +1,16 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { MainLayout } from '@/app/layouts/MainLayout';
 import { lazy, Suspense } from 'react';
-import type { UserRole } from '@/types/auth.types';
+import type { UserRole, Permission } from '@/types/auth.types';
 import { ProtectedRoute } from '@/app/components/ProtectedRoute';
+import { RoleGuard, PermissionGuard } from '@/components/auth';
 
 // ============ CORE PAGES ============
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/DashboardPage'));
 const NotFoundPage = lazy(() => import('@/app/pages/NotFoundPage'));
 const ProfilePage = lazy(() => import('@/features/profile/pages/ProfilePage'));
 const MobileDashboard = lazy(() => import('@/features/mobile/pages/MobileDashboard'));
+const ChangePasswordPage = lazy(() => import('@/features/auth/pages/ChangePasswordPage'));
 
 // ============ PUBLIC PAGES (No Layout) ============
 const RBACLogin = lazy(() => import('@/features/rbac/pages/RBACLogin'));
@@ -52,14 +54,26 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function ProtectedPage({ 
   children, 
   allowedRoles, 
-  allowedDevices 
+  allowedDevices,
+  requiredPermission,
+  requiredPermissions,
+  requireAllPermissions = false,
 }: { 
   children: React.ReactNode; 
   allowedRoles?: UserRole[];
   allowedDevices?: ('desktop' | 'tablet' | 'mobile')[];
+  requiredPermission?: Permission;
+  requiredPermissions?: Permission[];
+  requireAllPermissions?: boolean;
 }) {
   return (
-    <ProtectedRoute allowedRoles={allowedRoles} allowedDevices={allowedDevices}>
+    <ProtectedRoute 
+      allowedRoles={allowedRoles} 
+      allowedDevices={allowedDevices}
+      requiredPermission={requiredPermission}
+      requiredPermissions={requiredPermissions}
+      requireAll={requireAllPermissions}
+    >
       <Suspense fallback={<PageLoader />}>
         {children}
       </Suspense>
@@ -73,6 +87,16 @@ function ProtectedPage({
 const profileRoute = {
   path: 'profile',
   element: <ProtectedPage allowedRoles={undefined}><ProfilePage /></ProtectedPage>,
+};
+
+// Change password page (accessible to all authenticated)
+const changePasswordRoute = {
+  path: 'change-password',
+  element: (
+    <ProtectedPage allowedRoles={undefined}>
+      <ChangePasswordPage />
+    </ProtectedPage>
+  ),
 };
 
 // Mobile app route
@@ -135,7 +159,41 @@ export const router = createBrowserRouter([
       supportRoutes,
       adminRoutes,
       profileRoute,
+      changePasswordRoute,
       mobileRoute,
+      
+      // ============ RBAC PROTECTED ROUTE EXAMPLES ============
+      // These demonstrate how to use RoleGuard and PermissionGuard for routes
+      
+      // Admin-only route using RoleGuard
+      {
+        path: 'admin-only',
+        element: (
+          <RoleGuard 
+            allowedRoles={['SuperAdmin', 'CCHead']} 
+            showAccessDenied
+          >
+            <Suspense fallback={<PageLoader />}>
+              <div className="p-8 text-white">Admin Only Content</div>
+            </Suspense>
+          </RoleGuard>
+        ),
+      },
+      
+      // Permission-protected route using PermissionGuard
+      {
+        path: 'finance-reports',
+        element: (
+          <PermissionGuard 
+            permission={['finance:view', 'finance:export']} 
+            showAccessDenied
+          >
+            <Suspense fallback={<PageLoader />}>
+              <div className="p-8 text-white">Finance Reports</div>
+            </Suspense>
+          </PermissionGuard>
+        ),
+      },
       
       // ============ LEGACY REDIRECTS ============
       {

@@ -1,8 +1,8 @@
 // src/features/shifts/pages/ShiftDetailPage.tsx
-// Individual Shift Detail View
+// Individual Shift Detail View with Clock In/Out and Break Management
 
 import { useParams, useNavigate } from 'react-router-dom';
-import { useShift, useCancelShift } from '@/features/shifts/hooks/useShifts';
+import { useShift, useCancelShift, useClockIn, useClockOut, useStartBreak, useEndBreak } from '@/features/shifts/hooks/useShifts';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { XpressCard as Card } from '@/components/ui/XpressCard';
@@ -18,24 +18,28 @@ import {
   CheckCircle,
   XCircle,
   DollarSign,
-  Route
+  Route,
+  Coffee,
+  PlayCircle,
+  PauseCircle,
 } from 'lucide-react';
 
-const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: 'bg-gray-500',
-  CLOCKED_IN: 'bg-blue-500',
-  ACTIVE: 'bg-green-500',
-  ON_BREAK: 'bg-yellow-500',
-  COMPLETED: 'bg-green-600',
-  CANCELLED: 'bg-red-500',
-  NO_SHOW: 'bg-red-600',
-};
+// Import new components
+import { ShiftStatusBadge } from '../components/ShiftStatusBadge';
+import { ClockInButton } from '../components/ClockInButton';
+import { ClockOutButton } from '../components/ClockOutButton';
+import { BreakButton } from '../components/BreakButton';
+import type { ShiftStatus } from '../types';
 
 export default function ShiftDetailPage() {
   const { shiftId } = useParams<{ shiftId: string }>();
   const navigate = useNavigate();
   const { data: shift, isLoading } = useShift(shiftId || '');
   const cancelShift = useCancelShift();
+  const clockInMutation = useClockIn();
+  const clockOutMutation = useClockOut();
+  const startBreakMutation = useStartBreak();
+  const endBreakMutation = useEndBreak();
 
   if (isLoading) {
     return (
@@ -56,7 +60,23 @@ export default function ShiftDetailPage() {
     );
   }
 
-  const canCancel = ['SCHEDULED', 'CLOCKED_IN'].includes(shift.status);
+  const canCancel = ['SCHEDULED', 'CLOCKED_IN', 'ACTIVE'].includes(shift.status);
+  const canClockIn = shift.status === 'SCHEDULED';
+  const canClockOut = ['CLOCKED_IN', 'ACTIVE', 'ON_BREAK'].includes(shift.status);
+  const canManageBreak = ['CLOCKED_IN', 'ACTIVE', 'ON_BREAK'].includes(shift.status);
+  const isOnBreak = shift.status === 'ON_BREAK';
+
+  const handleClockInSuccess = () => {
+    // The mutation will invalidate the cache automatically
+  };
+
+  const handleClockOutSuccess = () => {
+    // The mutation will invalidate the cache automatically
+  };
+
+  const handleBreakSuccess = () => {
+    // The mutation will invalidate the cache automatically
+  };
 
   return (
     <div className="space-y-6">
@@ -72,12 +92,7 @@ export default function ShiftDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-white">Shift Details</h1>
-              <Badge 
-                variant="default" 
-                className={cn(STATUS_COLORS[shift.status], "text-white")}
-              >
-                {shift.status}
-              </Badge>
+              <ShiftStatusBadge status={shift.status} />
             </div>
             <p className="text-gray-400 text-sm">
               {format(new Date(shift.scheduledStart), 'MMMM d, yyyy')} • {shift.shiftType} Shift
@@ -85,17 +100,55 @@ export default function ShiftDetailPage() {
           </div>
         </div>
 
-        {canCancel && (
-          <Button 
-            variant="danger" 
-            icon={<XCircle className="w-4 h-4" />}
-            onClick={() => cancelShift.mutate(shift.id)}
-            disabled={cancelShift.isPending}
-          >
-            Cancel Shift
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          {canCancel && (
+            <Button 
+              variant="danger" 
+              icon={<XCircle className="w-4 h-4" />}
+              onClick={() => cancelShift.mutate(shift.id)}
+              disabled={cancelShift.isPending}
+            >
+              Cancel Shift
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Action Buttons for Clock In/Out and Breaks */}
+      {(canClockIn || canClockOut || canManageBreak) && (
+        <Card className="p-6 bg-[#12121a] border-white/10">
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-blue-400" />
+            Shift Actions
+          </h3>
+          <div className="flex flex-wrap gap-4">
+            {canClockIn && (
+              <ClockInButton
+                shiftId={shift.id}
+                onSuccess={handleClockInSuccess}
+                size="md"
+              />
+            )}
+            
+            {canClockOut && (
+              <ClockOutButton
+                shiftId={shift.id}
+                onSuccess={handleClockOutSuccess}
+                size="md"
+              />
+            )}
+            
+            {canManageBreak && (
+              <BreakButton
+                shiftId={shift.id}
+                isOnBreak={isOnBreak}
+                onSuccess={handleBreakSuccess}
+                size="md"
+              />
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-3 gap-6">
@@ -115,7 +168,7 @@ export default function ShiftDetailPage() {
                 {shift.driver?.firstName} {shift.driver?.lastName}
               </p>
               <p className="text-sm text-gray-400">{shift.driver?.phone}</p>
-              
+              <p className="text-xs text-gray-500 mt-1">ID: {shift.driverId}</p>
             </div>
           </div>
         </Card>
@@ -131,10 +184,13 @@ export default function ShiftDetailPage() {
             <div>
               <p className="text-lg font-medium text-white">{shift.asset.type}</p>
               <p className="text-sm text-gray-400">Plate: {shift.asset.plateNumber}</p>
-              <p className="text-sm text-gray-400">Type: {shift.asset.type}</p>
+              <p className="text-xs text-gray-500 mt-1">ID: {shift.asset.vehicleId}</p>
             </div>
           ) : (
-            <p className="text-gray-500">No vehicle assigned</p>
+            <div className="text-center py-4">
+              <Car className="w-10 h-10 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-500">No vehicle assigned</p>
+            </div>
           )}
         </Card>
 
@@ -146,20 +202,26 @@ export default function ShiftDetailPage() {
           </div>
           
           <div className="space-y-3">
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-gray-400">Total Revenue</span>
               <span className="text-xl font-bold text-green-400">
                 ₱{Number(shift.totalRevenue || 0).toLocaleString()}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-gray-400">Trips Completed</span>
-              <span className="text-white">{shift.tripCount || 0}</span>
+              <span className="text-white font-medium">{shift.tripCount || 0}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-gray-400">Utilized Minutes</span>
-              <span className="text-white">{shift.utilizedMinutes || 0} min</span>
+              <span className="text-white font-medium">{shift.utilizedMinutes || 0} min</span>
             </div>
+            {shift.breakCount ? (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Break Time</span>
+                <span className="text-yellow-400 font-medium">{shift.breakMinutes || 0} min ({shift.breakCount} breaks)</span>
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -186,19 +248,19 @@ export default function ShiftDetailPage() {
             icon={MapPin}
             title="Clock In"
             time={shift.actualStart || null}
-            details={shift.actualStart ? `Location: ${shift.clockInLat}, ${shift.clockInLng}` : 'Not yet clocked in'}
+            details={shift.actualStart ? `Location: ${shift.clockInLat?.toFixed(6)}, ${shift.clockInLng?.toFixed(6)}` : 'Not yet clocked in'}
             completed={!!shift.actualStart}
             warning={shift.isLate}
             warningText={shift.isLate ? `Late by ${shift.minutesLate} minutes` : undefined}
           />
 
           {/* Breaks */}
-          {(shift.breakCount || 0) > 0 && (
+          {shift.breakCount && shift.breakCount > 0 && (
             <TimelineItem
-              icon={Clock}
-              title={`Break ${shift.breakCount}`}
+              icon={Coffee}
+              title={`Break (${shift.breakCount})`}
               time={shift.breakStart || null}
-              details={`Duration: ${shift.breakMinutes} minutes`}
+              details={`Total break time: ${shift.breakMinutes} minutes`}
               completed={true}
             />
           )}
@@ -211,7 +273,7 @@ export default function ShiftDetailPage() {
             details={shift.actualEnd ? 'Shift completed' : 'Pending'}
             completed={!!shift.actualEnd}
             warning={shift.isUnderworking}
-            warningText={shift.isUnderworking ? `Underworking: ${shift.underworkingMinutes} minutes` : undefined}
+            warningText={shift.isUnderworking ? `Underworking: ${shift.underworkingMinutes} minutes short` : undefined}
           />
         </div>
       </Card>
@@ -281,14 +343,14 @@ function TimelineItem({
         <Icon className="w-5 h-5" />
       </div>
       <div className="flex-1 pb-4 border-b border-white/5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <h4 className="text-sm font-medium text-white">{title}</h4>
           {warning && warningText && (
             <Badge variant="warning" className="text-[10px]">{warningText}</Badge>
           )}
         </div>
         <p className="text-sm text-gray-400">
-          {time ? format(new Date(time), 'h:mm a') : '-'}
+          {time ? format(new Date(time), 'h:mm a, MMM d') : '-'}
         </p>
         <p className="text-xs text-gray-500 mt-1">{details}</p>
       </div>

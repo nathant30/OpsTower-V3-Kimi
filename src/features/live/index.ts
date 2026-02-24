@@ -1,7 +1,23 @@
-// Live Operations Feature
-export { default as LiveMap } from './pages/LiveMap';
-export { default as LiveRides } from './pages/LiveRides';
+/**
+ * Live Feature Module
+ * Real-time updates for drivers, orders, and incidents
+ */
 
 // Hooks
-export { useLiveDrivers, type LiveDriver, type DriverStatus } from './hooks/useLiveDrivers';
-export { useLiveRides, type LiveRide, type RideStatus } from './hooks/useLiveRides';
+export {
+  useLiveDrivers,
+  useLiveOrders,
+  useLiveIncidents,
+  type LiveDriver,
+  type LiveOrder,
+  type LiveIncident,
+  type UseLiveDriversOptions,
+  type UseLiveDriversReturn,
+  type UseLiveOrdersOptions,
+  type UseLiveOrdersReturn,
+  type UseLiveIncidentsOptions,
+  type UseLiveIncidentsReturn,
+} from './hooks';
+
+// Pages
+export { LiveMapPage } from './pages';

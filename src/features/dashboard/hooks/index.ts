@@ -42,3 +42,15 @@ export {
   type HeatmapPoint,
   type ZoneInfo,
 } from './useMapData';
+
+// New dashboard data hooks for real backend integration
+export {
+  useDashboardData,
+  useDashboardDriverStats,
+  useDashboardRecentIncidents,
+  useDashboardIncidentCounts,
+  DASHBOARD_QUERY_KEYS,
+  type DashboardStats,
+  type DashboardDriverStats,
+  type DashboardIncident,
+} from './useDashboardData';

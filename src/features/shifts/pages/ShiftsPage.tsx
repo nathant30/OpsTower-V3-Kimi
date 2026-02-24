@@ -3,14 +3,21 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useShifts, useLeaderboard, useRollCall, useCreateShift, type ShiftFilters, type CreateShiftInput, type ShiftType } from '@/features/shifts/hooks/useShifts';
+import { 
+  useShifts, 
+  useLeaderboard, 
+  useRollCall, 
+  useCreateShift, 
+  type ShiftFilters, 
+  type CreateShiftInput,
+  type ShiftType 
+} from '@/features/shifts/hooks/useShifts';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { XpressCard as Card } from '@/components/ui/XpressCard';
-import { Modal } from '@/components/ui/Modal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { cn } from '@/lib/utils/cn';
-import { format, differenceInMinutes } from 'date-fns';
+import { format } from 'date-fns';
 import { 
   Calendar, 
   Clock, 
@@ -24,21 +31,16 @@ import {
   Filter
 } from 'lucide-react';
 
+// Import new components
+import { ShiftTable } from '../components/ShiftTable';
+import { CreateShiftModal } from '../components/CreateShiftModal';
+import type { CreateShiftData, Shift } from '../types';
+
 const SHIFT_TYPES = [
   { value: 'AM', label: 'AM Shift', time: '6:00 AM - 2:00 PM', color: 'bg-amber-500' },
   { value: 'PM', label: 'PM Shift', time: '2:00 PM - 10:00 PM', color: 'bg-blue-500' },
   { value: 'NIGHT', label: 'Night Shift', time: '10:00 PM - 6:00 AM', color: 'bg-purple-500' },
 ];
-
-const STATUS_COLORS: Record<string, string> = {
-  SCHEDULED: 'bg-gray-500',
-  CLOCKED_IN: 'bg-blue-500',
-  ACTIVE: 'bg-green-500',
-  ON_BREAK: 'bg-yellow-500',
-  COMPLETED: 'bg-green-600',
-  CANCELLED: 'bg-red-500',
-  NO_SHOW: 'bg-red-600',
-};
 
 export default function ShiftsPage() {
   const navigate = useNavigate();
@@ -52,16 +54,31 @@ export default function ShiftsPage() {
   const { data: rollCall } = useRollCall(selectedType, selectedDate);
   const createShiftMutation = useCreateShift();
 
-  const todayShifts = shifts?.data || [];
+  const todayShifts: Shift[] = (shifts?.data || []) as Shift[];
 
   // Calculate stats
   const stats = {
     total: todayShifts.length,
-    active: todayShifts.filter((s: any) => ['CLOCKED_IN', 'ACTIVE', 'ON_BREAK'].includes(s.status)).length,
-    completed: todayShifts.filter((s: any) => s.status === 'COMPLETED').length,
-    incidents: todayShifts.filter((s: any) => s.hasIncident).length,
-    late: todayShifts.filter((s: any) => s.isLate).length,
-    underworking: todayShifts.filter((s: any) => s.isUnderworking).length,
+    active: todayShifts.filter((s) => ['CLOCKED_IN', 'ACTIVE', 'ON_BREAK'].includes(s.status)).length,
+    completed: todayShifts.filter((s) => s.status === 'COMPLETED').length,
+    incidents: todayShifts.filter((s) => s.hasIncident).length,
+    late: todayShifts.filter((s) => s.isLate).length,
+    underworking: todayShifts.filter((s) => s.isUnderworking).length,
+  };
+
+  const handleCreateShift = (data: CreateShiftData) => {
+    const input: CreateShiftInput = {
+      driverId: data.driverId,
+      assetId: data.assetId,
+      shiftType: data.shiftType,
+      scheduledStart: data.scheduledStart instanceof Date ? data.scheduledStart : new Date(data.scheduledStart),
+      scheduledEnd: data.scheduledEnd instanceof Date ? data.scheduledEnd : data.scheduledEnd ? new Date(data.scheduledEnd) : undefined,
+      geofenceId: data.geofenceId,
+    };
+    
+    createShiftMutation.mutate(input, {
+      onSuccess: () => setShowCreateModal(false),
+    });
   };
 
   return (
@@ -77,7 +94,7 @@ export default function ShiftsPage() {
             type="date"
             value={format(selectedDate, 'yyyy-MM-dd')}
             onChange={(e) => setSelectedDate(new Date(e.target.value))}
-            className="px-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-white text-sm"
+            className="px-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           />
           <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={() => setShowCreateModal(true)}>
             Create Shift
@@ -137,7 +154,7 @@ export default function ShiftsPage() {
             <select
               value={filters.status as string || ''}
               onChange={(e) => setFilters({ ...filters, status: e.target.value as any })}
-              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-300"
+              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="">All Statuses</option>
               <option value="SCHEDULED">Scheduled</option>
@@ -148,7 +165,7 @@ export default function ShiftsPage() {
               <option value="CANCELLED">Cancelled</option>
             </select>
 
-            <label className="flex items-center gap-2 text-sm text-gray-400">
+            <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
               <input
                 type="checkbox"
                 checked={filters.hasIncident || false}
@@ -160,118 +177,12 @@ export default function ShiftsPage() {
           </div>
 
           {/* Shifts Table */}
-          <div className="bg-[#12121a] border border-white/10 rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-white/5">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Driver</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Scheduled</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Duration</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Revenue</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Flags</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                      Loading shifts...
-                    </td>
-                  </tr>
-                ) : todayShifts.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                      No shifts found for this date
-                    </td>
-                  </tr>
-                ) : (
-                  todayShifts.map((shift: any) => (
-                    <tr 
-                      key={shift.id} 
-                      className="hover:bg-white/5 cursor-pointer"
-                      onClick={() => navigate(`/shifts/${shift.id}`)}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-medium text-white">
-                            {shift.driver?.firstName?.[0]}{shift.driver?.lastName?.[0]}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-white">
-                              {shift.driver?.firstName} {shift.driver?.lastName}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {shift.driver?.phoneNumber}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge 
-                          variant="default" 
-                          className={cn(
-                            "text-xs",
-                            shift.shiftType === 'AM' && "bg-amber-500/20 text-amber-400",
-                            shift.shiftType === 'PM' && "bg-blue-500/20 text-blue-400",
-                            shift.shiftType === 'NIGHT' && "bg-purple-500/20 text-purple-400",
-                          )}
-                        >
-                          {shift.shiftType}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className={cn("w-2 h-2 rounded-full", STATUS_COLORS[shift.status])} />
-                          <span className="text-sm text-gray-300">{shift.status}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm text-gray-300">
-                          {format(new Date(shift.scheduledStart), 'h:mm a')}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {format(new Date(shift.scheduledEnd), 'h:mm a')}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {shift.actualStart && shift.actualEnd ? (
-                          <span className="text-sm text-gray-300">
-                            {differenceInMinutes(new Date(shift.actualEnd), new Date(shift.actualStart)) >= 60 ? `${Math.floor(differenceInMinutes(new Date(shift.actualEnd), new Date(shift.actualStart)) / 60)}h ` : ''}{differenceInMinutes(new Date(shift.actualEnd), new Date(shift.actualStart)) % 60}m
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-green-400">
-                          ₱{Number(shift.totalRevenue || 0).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          {shift.isLate && (
-                            <Badge variant="warning" className="text-[10px]">Late</Badge>
-                          )}
-                          {shift.hasIncident && (
-                            <Badge variant="alert" className="text-[10px]">Incident</Badge>
-                          )}
-                          {shift.isUnderworking && (
-                            <Badge variant="default" className="text-[10px] bg-orange-500/20 text-orange-400">Under</Badge>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <ChevronRight className="w-4 h-4 text-gray-500 inline" />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <ShiftTable 
+            shifts={todayShifts}
+            isLoading={isLoading}
+            emptyMessage="No shifts found for this date"
+            onRowClick={(shift) => navigate(`/shifts/${shift.id}`)}
+          />
         </TabsContent>
 
         {/* Roll Call Tab - View Only */}
@@ -400,91 +311,10 @@ export default function ShiftsPage() {
       <CreateShiftModal 
         isOpen={showCreateModal} 
         onClose={() => setShowCreateModal(false)} 
-        onCreate={(data) => {
-          createShiftMutation.mutate(data, {
-            onSuccess: () => setShowCreateModal(false),
-          });
-        }}
+        onCreate={handleCreateShift}
         isCreating={createShiftMutation.isPending}
       />
     </div>
-  );
-}
-
-// Create Shift Modal Component
-function CreateShiftModal({ 
-  isOpen, 
-  onClose, 
-  onCreate, 
-  isCreating 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  onCreate: (data: CreateShiftInput) => void;
-  isCreating: boolean;
-}) {
-  const [driverId, setDriverId] = useState('');
-  const [shiftType, setShiftType] = useState<ShiftType>('AM');
-  const [scheduledStart, setScheduledStart] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onCreate({
-      driverId,
-      shiftType,
-      scheduledStart: new Date(scheduledStart),
-    });
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Shift" size="md">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">Driver ID</label>
-          <input
-            type="text"
-            value={driverId}
-            onChange={(e) => setDriverId(e.target.value)}
-            placeholder="e.g., D001"
-            className="w-full px-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-white text-sm"
-            required
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">Shift Type</label>
-          <select
-            value={shiftType}
-            onChange={(e) => setShiftType(e.target.value as ShiftType)}
-            className="w-full px-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-white text-sm"
-          >
-            <option value="AM">AM Shift (6:00 AM - 2:00 PM)</option>
-            <option value="PM">PM Shift (2:00 PM - 10:00 PM)</option>
-            <option value="NIGHT">Night Shift (10:00 PM - 6:00 AM)</option>
-          </select>
-        </div>
-        
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">Scheduled Start</label>
-          <input
-            type="datetime-local"
-            value={scheduledStart}
-            onChange={(e) => setScheduledStart(e.target.value)}
-            className="w-full px-3 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-white text-sm"
-            required
-          />
-        </div>
-        
-        <div className="flex justify-end gap-3 pt-4">
-          <Button variant="ghost" onClick={onClose} type="button">
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" loading={isCreating}>
-            Create Shift
-          </Button>
-        </div>
-      </form>
-    </Modal>
   );
 }
 

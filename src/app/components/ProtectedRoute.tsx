@@ -5,13 +5,14 @@
  * Features:
  * - Authentication check (redirects to /rbac/login)
  * - Role-based access control (allowedRoles)
+ * - Permission-based access control (requiredPermission, requiredPermissions)
  * - Device-type restrictions (allowedDevices)
  * - Loading states
  */
 
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/lib/stores/auth.store';
-import type { UserRole } from '@/types/auth.types';
+import type { UserRole, Permission } from '@/types/auth.types';
 
 export type DeviceType = 'desktop' | 'tablet' | 'mobile';
 
@@ -21,6 +22,12 @@ interface ProtectedRouteProps {
   allowedDevices?: DeviceType[];
   requireAuth?: boolean;
   fallback?: React.ReactNode;
+  /** Single permission required to access this route */
+  requiredPermission?: Permission;
+  /** Multiple permissions required to access this route */
+  requiredPermissions?: Permission[];
+  /** Whether ALL permissions are required (default: false = any permission grants access) */
+  requireAll?: boolean;
 }
 
 // Detect device type based on screen width and user agent
@@ -81,12 +88,32 @@ function isDeviceAllowed(currentDevice: DeviceType, allowedDevices?: DeviceType[
   return allowedDevices.includes(currentDevice);
 }
 
+// Check if user has required permission
+function hasPermission(userPermissions: Permission[], required: Permission): boolean {
+  return userPermissions.includes('*:*') || userPermissions.includes(required);
+}
+
+// Check if user has any of the required permissions
+function hasAnyPermission(userPermissions: Permission[], required: Permission[]): boolean {
+  if (userPermissions.includes('*:*')) return true;
+  return required.some(perm => userPermissions.includes(perm));
+}
+
+// Check if user has all required permissions
+function hasAllPermissions(userPermissions: Permission[], required: Permission[]): boolean {
+  if (userPermissions.includes('*:*')) return true;
+  return required.every(perm => userPermissions.includes(perm));
+}
+
 export function ProtectedRoute({
   children,
   allowedRoles,
   allowedDevices,
   requireAuth = true,
   fallback,
+  requiredPermission,
+  requiredPermissions,
+  requireAll = false,
 }: ProtectedRouteProps): React.ReactElement {
   const location = useLocation();
   const { isAuthenticated, user } = useAuthStore();
@@ -129,6 +156,68 @@ export function ProtectedRoute({
         </div>
       </div>
     );
+  }
+
+  // Check single permission
+  if (user && requiredPermission && !hasPermission(user.permissions, requiredPermission)) {
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-[#0a0a0f] p-6">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Permission Denied</h2>
+          <p className="text-gray-400 mb-6">
+            You don't have the required permission to access this feature.
+          </p>
+          <button
+            onClick={() => window.history.back()}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Check multiple permissions
+  if (user && requiredPermissions && requiredPermissions.length > 0) {
+    const hasAccess = requireAll
+      ? hasAllPermissions(user.permissions, requiredPermissions)
+      : hasAnyPermission(user.permissions, requiredPermissions);
+
+    if (!hasAccess) {
+      if (fallback) {
+        return <>{fallback}</>;
+      }
+      return (
+        <div className="flex flex-col items-center justify-center h-screen bg-[#0a0a0f] p-6">
+          <div className="text-center max-w-md">
+            <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Permission Denied</h2>
+            <p className="text-gray-400 mb-6">
+              You don't have the required permissions to access this feature.
+            </p>
+            <button
+              onClick={() => window.history.back()}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
   
   // Check device restrictions

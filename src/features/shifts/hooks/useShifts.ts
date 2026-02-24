@@ -4,8 +4,30 @@ import { apiClient } from '@/lib/api/client';
 import type { ShiftType, ShiftStatus } from '@/types/domain.types';
 export type { ShiftType, ShiftStatus };
 
-// Shift entity type
-export interface Shift {
+// Import from the new service and types
+import {
+  getShifts,
+  getShiftById,
+  createShift,
+  clockIn,
+  clockOut,
+  startBreak,
+  endBreak,
+  cancelShift,
+} from '@/services/shifts/shift.service';
+import type { 
+  Shift, 
+  ShiftFilters, 
+  CreateShiftData, 
+  ClockInData, 
+  ClockOutData, 
+  StartBreakData,
+  ShiftType as LocalShiftType,
+} from '../types';
+export type { Shift, ShiftFilters, CreateShiftData };
+
+// Legacy Shift entity type (for backwards compatibility)
+export interface LegacyShift {
   id: string;
   shiftId: string;
   driverId: string;
@@ -46,20 +68,10 @@ export interface Shift {
   hasIncident?: boolean;
 }
 
-export interface ShiftFilters {
-  status?: ShiftStatus | ShiftStatus[];
-  shiftType?: ShiftType;
-  date?: Date;
-  driverId?: string;
-  hasIncident?: boolean;
-  underWorking?: boolean;
-  lateArrival?: boolean;
-}
-
 export interface CreateShiftInput {
   driverId: string;
   assetId?: string;
-  shiftType: ShiftType;
+  shiftType: LocalShiftType;
   scheduledStart: Date;
   scheduledEnd?: Date;
   geofenceId?: string;
@@ -101,10 +113,10 @@ export interface LeaderboardEntry {
 // Mock shift data
 const mockShifts = {
   data: [
-    { id: 'S001', shiftId: 'S001', driverId: 'D001', driverName: 'Juan Santos', shiftType: 'AM', status: 'Completed', scheduledStart: new Date(Date.now() - 8*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() - 2*60*60*1000).toISOString(), actualStart: new Date(Date.now() - 7.9*60*60*1000).toISOString(), actualEnd: new Date(Date.now() - 2.1*60*60*1000).toISOString(), duration: 360, revenue: 2850, trips: 18, hasIncident: false, isLate: false },
-    { id: 'S002', shiftId: 'S002', driverId: 'D002', driverName: 'Maria Cruz', shiftType: 'AM', status: 'Active', scheduledStart: new Date(Date.now() - 4*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() + 2*60*60*1000).toISOString(), actualStart: new Date(Date.now() - 4.1*60*60*1000).toISOString(), duration: 240, revenue: 1920, trips: 12, hasIncident: false, isLate: true },
-    { id: 'S003', shiftId: 'S003', driverId: 'D005', driverName: 'Pedro Reyes', shiftType: 'PM', status: 'Scheduled', scheduledStart: new Date(Date.now() + 1*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() + 9*60*60*1000).toISOString(), hasIncident: false, isLate: false },
-    { id: 'S004', shiftId: 'S004', driverId: 'D007', driverName: 'Ana Lopez', shiftType: 'PM', status: 'Active', scheduledStart: new Date(Date.now() - 2*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() + 6*60*60*1000).toISOString(), actualStart: new Date(Date.now() - 2*60*60*1000).toISOString(), duration: 120, revenue: 980, trips: 7, hasIncident: true, isLate: false },
+    { id: 'S001', shiftId: 'S001', driverId: 'D001', driverName: 'Juan Santos', shiftType: 'AM', status: 'COMPLETED', scheduledStart: new Date(Date.now() - 8*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() - 2*60*60*1000).toISOString(), actualStart: new Date(Date.now() - 7.9*60*60*1000).toISOString(), actualEnd: new Date(Date.now() - 2.1*60*60*1000).toISOString(), duration: 360, revenue: 2850, trips: 18, hasIncident: false, isLate: false },
+    { id: 'S002', shiftId: 'S002', driverId: 'D002', driverName: 'Maria Cruz', shiftType: 'AM', status: 'ACTIVE', scheduledStart: new Date(Date.now() - 4*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() + 2*60*60*1000).toISOString(), actualStart: new Date(Date.now() - 4.1*60*60*1000).toISOString(), duration: 240, revenue: 1920, trips: 12, hasIncident: false, isLate: true },
+    { id: 'S003', shiftId: 'S003', driverId: 'D005', driverName: 'Pedro Reyes', shiftType: 'PM', status: 'SCHEDULED', scheduledStart: new Date(Date.now() + 1*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() + 9*60*60*1000).toISOString(), hasIncident: false, isLate: false },
+    { id: 'S004', shiftId: 'S004', driverId: 'D007', driverName: 'Ana Lopez', shiftType: 'PM', status: 'ON_BREAK', scheduledStart: new Date(Date.now() - 2*60*60*1000).toISOString(), scheduledEnd: new Date(Date.now() + 6*60*60*1000).toISOString(), actualStart: new Date(Date.now() - 2*60*60*1000).toISOString(), duration: 120, revenue: 980, trips: 7, hasIncident: true, isLate: false, breakCount: 1, breakMinutes: 15 },
   ],
   total: 4,
   page: 1,
@@ -135,19 +147,8 @@ export function useShifts(filters: ShiftFilters = {}, page: number = 1, limit: n
     queryKey: ['shifts', filters, page, limit],
     queryFn: async () => {
       try {
-        const params = new URLSearchParams();
-        if (filters.status) params.append('status', filters.status as string);
-        if (filters.shiftType) params.append('shiftType', filters.shiftType);
-        if (filters.driverId) params.append('driverId', filters.driverId);
-        if (filters.date) params.append('date', filters.date.toISOString());
-        if (filters.hasIncident !== undefined) params.append('hasIncident', String(filters.hasIncident));
-        if (filters.underWorking !== undefined) params.append('underWorking', String(filters.underWorking));
-        if (filters.lateArrival !== undefined) params.append('lateArrival', String(filters.lateArrival));
-        params.append('page', String(page));
-        params.append('limit', String(limit));
-
-        const response = await apiClient.get<{data: Shift[]; total: number; page: number; limit: number; totalPages: number}>(`/shifts?${params.toString()}`);
-        // Return mock if empty
+        const response = await getShifts(filters, page, limit);
+        // Return mock if empty for development
         if (!response?.data || response.data.length === 0) {
           return mockShifts;
         }
@@ -165,7 +166,7 @@ export function useShift(shiftId: string) {
     queryKey: ['shift', shiftId],
     queryFn: async () => {
       try {
-        const response = await apiClient.get<Shift>(`/shifts/${shiftId}`);
+        const response = await getShiftById(shiftId);
         if (response) return response;
       } catch (error) {
         // Return mock data for development
@@ -176,12 +177,16 @@ export function useShift(shiftId: string) {
         return {
           ...mockShift,
           id: mockShift.shiftId,
+          shiftType: mockShift.shiftType as LocalShiftType,
+          status: mockShift.status.toUpperCase() as Shift['status'],
         } as Shift;
       }
       // Return first mock shift as fallback
       return {
         ...mockShifts.data[0],
         id: mockShifts.data[0].shiftId,
+        shiftType: mockShifts.data[0].shiftType as LocalShiftType,
+        status: mockShifts.data[0].status.toUpperCase() as Shift['status'],
       } as Shift;
     },
     enabled: !!shiftId,
@@ -193,11 +198,78 @@ export function useCreateShift() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (input: CreateShiftInput) => {
-      const response = await apiClient.post('/shifts', input);
-      return response;
+    mutationFn: async (input: CreateShiftInput | CreateShiftData) => {
+      const data: CreateShiftData = {
+        driverId: input.driverId,
+        assetId: input.assetId,
+        shiftType: input.shiftType as LocalShiftType,
+        scheduledStart: input.scheduledStart,
+        scheduledEnd: input.scheduledEnd,
+        geofenceId: input.geofenceId,
+      };
+      return createShift(data);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    },
+  });
+}
+
+// Clock in hook
+export function useClockIn() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ shiftId, data }: { shiftId: string; data?: ClockInData }) => {
+      return clockIn(shiftId, data || {});
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['shift', variables.shiftId] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    },
+  });
+}
+
+// Clock out hook
+export function useClockOut() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ shiftId, data }: { shiftId: string; data?: ClockOutData }) => {
+      return clockOut(shiftId, data || {});
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['shift', variables.shiftId] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    },
+  });
+}
+
+// Start break hook
+export function useStartBreak() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ shiftId, data }: { shiftId: string; data?: StartBreakData }) => {
+      return startBreak(shiftId, data || {});
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['shift', variables.shiftId] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+    },
+  });
+}
+
+// End break hook
+export function useEndBreak() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (shiftId: string) => {
+      return endBreak(shiftId);
+    },
+    onSuccess: (_, shiftId) => {
+      queryClient.invalidateQueries({ queryKey: ['shift', shiftId] });
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
     },
   });
@@ -248,8 +320,7 @@ export function useCancelShift() {
   
   return useMutation({
     mutationFn: async (shiftId: string) => {
-      const response = await apiClient.patch(`/shifts/${shiftId}/cancel`);
-      return response;
+      return cancelShift(shiftId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });

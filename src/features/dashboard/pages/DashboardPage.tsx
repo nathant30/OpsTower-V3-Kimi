@@ -3,12 +3,21 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDashboardStats } from '@/features/dashboard/hooks/useDashboardStats';
 import { useLiveMapOrders, useLiveMapDrivers } from '@/features/dashboard/hooks/useLiveMapOrders';
+import { 
+  useDashboardData, 
+  useDashboardDriverStats, 
+  useDashboardRecentIncidents 
+} from '@/features/dashboard/hooks/useDashboardData';
 import { KpiRibbon } from '@/features/dashboard/components/KpiRibbon';
 import { TacticalMap } from '@/features/dashboard/components/TacticalMap';
+import { StatCard } from '@/features/dashboard/components/StatCard';
+import { TierDistributionChart } from '@/features/dashboard/components/TierDistributionChart';
+import { RecentIncidentsList } from '@/features/dashboard/components/RecentIncidentsList';
 import { useLastUpdatedText } from '@/features/orders/hooks/useOrders';
 import { toast } from '@/components/auth/ToastProvider';
-import { RefreshCw, Clock, Users, Car, Award, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Clock, Users, Car, Award, AlertTriangle, TrendingUp, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { invalidateDashboardQueries } from '@/lib/api/queryClient';
 
 // Tab components
 import { FleetStatusTab } from '@/features/dashboard/components/FleetStatusTab';
@@ -62,11 +71,40 @@ export default function DashboardPage() {
   const { isFetching: isFetchingOrders } = useLiveMapOrders();
   const { isFetching: isFetchingDrivers } = useLiveMapDrivers();
 
-  const lastUpdatedText = useLastUpdatedText(statsUpdatedAt || lastRefreshTime);
+  // Real backend data fetching
+  const { 
+    data: dashboardData, 
+    isLoading: isLoadingDashboardData,
+    error: dashboardDataError,
+    dataUpdatedAt: dashboardDataUpdatedAt,
+  } = useDashboardData();
+
+  const { 
+    data: driverStats, 
+    isLoading: isLoadingDriverStats 
+  } = useDashboardDriverStats();
+
+  const { 
+    data: recentIncidents, 
+    isLoading: isLoadingIncidents 
+} = useDashboardRecentIncidents(5);
+
+  // Use the most recent update time
+  const lastUpdatedText = useLastUpdatedText(
+    dashboardDataUpdatedAt || statsUpdatedAt || lastRefreshTime
+  );
+
+  // Handle errors
+  useEffect(() => {
+    if (dashboardDataError) {
+      console.error('[Dashboard] Failed to load dashboard data:', dashboardDataError);
+    }
+  }, [dashboardDataError]);
 
   // Manual refresh handler
   const handleRefresh = useCallback(async () => {
     setLastRefreshTime(Date.now());
+    await invalidateDashboardQueries();
     await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     toast.success('Dashboard refreshed');
   }, [queryClient]);
@@ -153,8 +191,67 @@ export default function DashboardPage() {
       {/* KPI Ribbon */}
       <KpiRibbon stats={stats} />
 
+      {/* Real Data Stats Section - Driver & Incident Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Drivers Stat */}
+        <StatCard
+          title="Total Drivers"
+          value={driverStats?.totalDrivers?.toLocaleString() ?? '—'}
+          subtitle={driverStats?.activeDrivers ? `${driverStats.activeDrivers} active` : undefined}
+          icon={<Users className="w-5 h-5" />}
+          color="blue"
+          isLoading={isLoadingDriverStats}
+        />
+
+        {/* Active Incidents Stat */}
+        <StatCard
+          title="Active Incidents"
+          value={dashboardData?.incidents?.active?.toString() ?? '—'}
+          subtitle={dashboardData?.incidents?.critical ? `${dashboardData.incidents.critical} critical` : undefined}
+          icon={<ShieldAlert className="w-5 h-5" />}
+          color={dashboardData?.incidents?.critical ? 'red' : 'amber'}
+          isLoading={isLoadingDashboardData}
+        />
+
+        {/* Fleet Utilization */}
+        <StatCard
+          title="Fleet Utilization"
+          value={`${stats?.fleetUtilization ?? 0}%`}
+          subtitle={`${stats?.activeVehicles ?? 0} / ${stats?.totalVehicles ?? 0} vehicles`}
+          icon={<Car className="w-5 h-5" />}
+          trend={{ value: 8.2, label: 'vs yesterday' }}
+          color="green"
+          isLoading={isFetchingStats}
+        />
+
+        {/* Revenue Per Hour */}
+        <StatCard
+          title="Revenue / Hour"
+          value={`₱${(stats?.revenuePerHour ?? 0).toLocaleString()}`}
+          subtitle={`₱${(stats?.totalRevenue ?? 0).toLocaleString()} total today`}
+          icon={<TrendingUp className="w-5 h-5" />}
+          trend={{ value: 12.5, label: 'vs yesterday' }}
+          color="purple"
+          isLoading={isFetchingStats}
+        />
+      </div>
+
+      {/* Tier Distribution & Recent Incidents Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <TierDistributionChart
+          distribution={driverStats?.tierDistribution ?? []}
+          totalDrivers={driverStats?.totalDrivers ?? 0}
+          isLoading={isLoadingDriverStats}
+        />
+        <RecentIncidentsList
+          incidents={recentIncidents ?? []}
+          isLoading={isLoadingIncidents}
+          maxItems={5}
+        />
+      </div>
+
       {/* Loading indicator for background refresh */}
-      {(isFetchingStats || isFetchingOrders || isFetchingDrivers) && (
+      {(isFetchingStats || isFetchingOrders || isFetchingDrivers || isLoadingDashboardData) && (
         <div className="flex items-center gap-2 text-xs text-gray-500 animate-pulse">
           <div className="w-2 h-2 bg-blue-500 rounded-full" />
           <span>Syncing data...</span>

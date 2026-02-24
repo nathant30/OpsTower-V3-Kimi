@@ -1,5 +1,6 @@
 import { QueryClient, QueryCache, MutationCache } from '@tanstack/react-query';
 import { ApiError } from './client';
+import { DASHBOARD_QUERY_KEYS } from '@/services/dashboard.service';
 
 /**
  * Global React Query client configuration
@@ -59,7 +60,7 @@ export const queryClient = new QueryClient({
 export function prefetchDashboardData() {
   // Prefetch dashboard stats
   queryClient.prefetchQuery({
-    queryKey: ['dashboardStats'],
+    queryKey: [DASHBOARD_QUERY_KEYS.stats],
     staleTime: 30000,
   });
 }
@@ -68,8 +69,42 @@ export function prefetchDashboardData() {
  * Invalidate all dashboard-related queries
  */
 export function invalidateDashboardQueries() {
+  // Invalidate all dashboard query keys
   queryClient.invalidateQueries({
-    queryKey: ['dashboard'],
+    queryKey: [DASHBOARD_QUERY_KEYS.stats],
+  });
+  queryClient.invalidateQueries({
+    queryKey: [DASHBOARD_QUERY_KEYS.driverStats],
+  });
+  queryClient.invalidateQueries({
+    queryKey: [DASHBOARD_QUERY_KEYS.incidents],
+  });
+  queryClient.invalidateQueries({
+    queryKey: [DASHBOARD_QUERY_KEYS.recentIncidents],
+  });
+}
+
+/**
+ * Invalidate driver-related dashboard queries
+ */
+export function invalidateDriverStatsQueries() {
+  queryClient.invalidateQueries({
+    queryKey: [DASHBOARD_QUERY_KEYS.driverStats],
+  });
+  queryClient.invalidateQueries({
+    queryKey: [DASHBOARD_QUERY_KEYS.tierDistribution],
+  });
+}
+
+/**
+ * Invalidate incident-related dashboard queries
+ */
+export function invalidateIncidentQueries() {
+  queryClient.invalidateQueries({
+    queryKey: [DASHBOARD_QUERY_KEYS.incidents],
+  });
+  queryClient.invalidateQueries({
+    queryKey: [DASHBOARD_QUERY_KEYS.recentIncidents],
   });
 }
 

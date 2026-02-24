@@ -1,11 +1,21 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, AuthState } from '@/types/auth.types';
+import type { User, UserRole, Permission, AuthState } from '@/types/auth.types';
 
 interface AuthStore extends AuthState {
+  // Actions
   login: (token: string, user: User) => void;
   logout: () => void;
   setUser: (user: User | null) => void;
+  updateUser: (updates: Partial<User>) => void;
+  
+  // RBAC Helpers
+  hasRole: (role: UserRole | UserRole[]) => boolean;
+  hasPermission: (permission: Permission | Permission[]) => boolean;
+  hasAllPermissions: (permissions: Permission[]) => boolean;
+  isAdmin: () => boolean;
+  isSuperAdmin: () => boolean;
+  getRoleLevel: () => number;
 }
 
 // Initial state - no default user (require actual authentication)
@@ -17,9 +27,32 @@ const initialState: AuthState = {
   error: null,
 };
 
+// Role hierarchy for level comparison (higher index = higher privilege)
+const ROLE_HIERARCHY: UserRole[] = [
+  'Viewer',
+  'Audit',
+  'Support',
+  'SupportAgent',
+  'UtilityCrew',
+  'FieldOperator',
+  'ERT',
+  'Finance',
+  'FinanceManager',
+  'CCOperator',
+  'Compliance',
+  'CCTeamLead',
+  'FleetManager',
+  'DepotManager',
+  'OperationsManager',
+  'CCManager',
+  'OperationsDirector',
+  'CCHead',
+  'SuperAdmin',
+];
+
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialState,
 
       login: (token: string, user: User) => {
@@ -35,18 +68,100 @@ export const useAuthStore = create<AuthStore>()(
       logout: () => {
         // Clear all auth data
         localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
+          ...initialState,
         });
       },
 
       setUser: (user: User | null) => {
         set({ user });
+      },
+
+      updateUser: (updates: Partial<User>) => {
+        const currentUser = get().user;
+        if (!currentUser) return;
+        
+        set({
+          user: { ...currentUser, ...updates },
+        });
+      },
+
+      /**
+       * Check if user has a specific role or any of the specified roles
+       */
+      hasRole: (role: UserRole | UserRole[]): boolean => {
+        const { user } = get();
+        if (!user) return false;
+
+        const rolesToCheck = Array.isArray(role) ? role : [role];
+        return rolesToCheck.includes(user.role);
+      },
+
+      /**
+       * Check if user has a specific permission or any of the specified permissions
+       * SuperAdmin with '*:*' permission has all permissions
+       */
+      hasPermission: (permission: Permission | Permission[]): boolean => {
+        const { user } = get();
+        if (!user) return false;
+
+        // SuperAdmin has all permissions
+        if (user.permissions.includes('*:*')) return true;
+
+        const permissionsToCheck = Array.isArray(permission) ? permission : [permission];
+        return permissionsToCheck.some(perm => user.permissions.includes(perm));
+      },
+
+      /**
+       * Check if user has ALL of the specified permissions
+       * SuperAdmin with '*:*' permission has all permissions
+       */
+      hasAllPermissions: (permissions: Permission[]): boolean => {
+        const { user } = get();
+        if (!user) return false;
+
+        // SuperAdmin has all permissions
+        if (user.permissions.includes('*:*')) return true;
+
+        return permissions.every(perm => user.permissions.includes(perm));
+      },
+
+      /**
+       * Check if user is an admin (SuperAdmin, CCHead, or has admin:system permission)
+       */
+      isAdmin: (): boolean => {
+        const { user } = get();
+        if (!user) return false;
+
+        return (
+          user.role === 'SuperAdmin' ||
+          user.role === 'CCHead' ||
+          user.role === 'OperationsDirector' ||
+          user.permissions.includes('admin:system') ||
+          user.permissions.includes('*:*')
+        );
+      },
+
+      /**
+       * Check if user is SuperAdmin
+       */
+      isSuperAdmin: (): boolean => {
+        const { user } = get();
+        if (!user) return false;
+
+        return user.role === 'SuperAdmin' || user.permissions.includes('*:*');
+      },
+
+      /**
+       * Get the numeric level of the user's role (higher = more privileged)
+       */
+      getRoleLevel: (): number => {
+        const { user } = get();
+        if (!user) return -1;
+
+        return ROLE_HIERARCHY.indexOf(user.role);
       },
     }),
     {
