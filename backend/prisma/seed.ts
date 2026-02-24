@@ -81,11 +81,11 @@ async function main() {
 
   // Create sample drivers
   const drivers = [
-    { employeeId: 'DRV001', firstName: 'Juan', lastName: 'Dela Cruz', phonePrimary: '+639171234567', currentTier: 'GOLD', status: 'ACTIVE' },
-    { employeeId: 'DRV002', firstName: 'Maria', lastName: 'Santos', phonePrimary: '+639171234568', currentTier: 'SILVER', status: 'ACTIVE' },
-    { employeeId: 'DRV003', firstName: 'Pedro', lastName: 'Reyes', phonePrimary: '+639171234569', currentTier: 'BRONZE', status: 'ACTIVE' },
-    { employeeId: 'DRV004', firstName: 'Ana', lastName: 'Garcia', phonePrimary: '+639171234570', currentTier: 'PLATINUM', status: 'ACTIVE' },
-    { employeeId: 'DRV005', firstName: 'Miguel', lastName: 'Torres', phonePrimary: '+639171234571', currentTier: 'UNRANKED', status: 'TRAINING' },
+    { employeeId: 'DRV001', firstName: 'Juan', lastName: 'Dela Cruz', phonePrimary: '+639171234567', currentTier: 'GOLD', status: 'ACTIVE', licenseNumber: 'LIC001', licenseExpiry: new Date('2026-12-31') },
+    { employeeId: 'DRV002', firstName: 'Maria', lastName: 'Santos', phonePrimary: '+639171234568', currentTier: 'SILVER', status: 'ACTIVE', licenseNumber: 'LIC002', licenseExpiry: new Date('2026-12-31') },
+    { employeeId: 'DRV003', firstName: 'Pedro', lastName: 'Reyes', phonePrimary: '+639171234569', currentTier: 'BRONZE', status: 'ACTIVE', licenseNumber: 'LIC003', licenseExpiry: new Date('2026-12-31') },
+    { employeeId: 'DRV004', firstName: 'Ana', lastName: 'Garcia', phonePrimary: '+639171234570', currentTier: 'PLATINUM', status: 'ACTIVE', licenseNumber: 'LIC004', licenseExpiry: new Date('2026-12-31') },
+    { employeeId: 'DRV005', firstName: 'Miguel', lastName: 'Torres', phonePrimary: '+639171234571', currentTier: 'UNRANKED', status: 'TRAINING', licenseNumber: 'LIC005', licenseExpiry: new Date('2026-12-31') },
   ];
 
   for (const driverData of drivers) {
@@ -93,11 +93,18 @@ async function main() {
       where: { employeeId: driverData.employeeId },
       update: {},
       create: {
-        ...driverData,
+        employeeId: driverData.employeeId,
+        firstName: driverData.firstName,
+        lastName: driverData.lastName,
+        phonePrimary: driverData.phonePrimary,
+        currentTier: driverData.currentTier as any,
+        status: driverData.status as any,
+        licenseNumber: driverData.licenseNumber,
+        licenseExpiry: driverData.licenseExpiry,
+        serviceSegment: 'FOUR_WHEEL_TNVS' as any,
+        hireDate: new Date('2024-01-01'),
         securityBondBalance: 5000,
         securityBondRequired: 5000,
-        trainingPeriodShifts: 5,
-        serviceSegment: '4W-TNVS',
       },
     });
     console.log('✅ Created driver:', driverData.employeeId);
