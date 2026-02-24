@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
+import websocket from '@fastify/websocket';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 
@@ -17,6 +18,9 @@ import complianceRoutes from './api/compliance.routes.js';
 import kpiRoutes from './api/kpi.routes.js';
 import paymentsRoutes from './api/payments.routes.js';
 import locationRoutes from './api/location.routes.js';
+
+// Import WebSocket hub
+import { initializeRealtimeHub } from './hubs/realtime.hub.js';
 
 dotenv.config();
 
@@ -54,6 +58,12 @@ fastify.register(jwt, {
 // Decorate fastify with prisma
 fastify.decorate('prisma', prisma);
 
+// Register WebSocket plugin
+fastify.register(websocket);
+
+// Initialize realtime hub
+initializeRealtimeHub(fastify);
+
 // Register API routes
 fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(driversRoutes, { prefix: '/api/drivers' });
@@ -74,6 +84,15 @@ fastify.get('/health', async () => {
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     service: 'opstower-v2-backend',
+  };
+});
+
+// WebSocket status endpoint
+fastify.get('/ws/status', async () => {
+  return {
+    status: 'ok',
+    websocket: true,
+    endpoint: '/ws/realtime',
   };
 });
 

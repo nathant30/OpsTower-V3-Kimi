@@ -184,7 +184,7 @@ export function useWebSocket<T extends WebSocketEventName>(
     // Subscribe to the event
     const unsubscribe = signalRClient.subscribe<WebSocketEvents[T]>(
       eventName,
-      (data) => {
+      (data: WebSocketEvents[T]) => {
         callbackRef.current(data);
       }
     );

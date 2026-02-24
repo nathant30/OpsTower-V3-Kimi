@@ -6,7 +6,7 @@
 // Core client
 export { 
   signalRClient, 
-  useConnectionStatus,
+  signalrClient,
   type ConnectionStatus,
   type EventCallback,
 } from './signalrClient';

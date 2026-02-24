@@ -77,7 +77,7 @@ export function WebSocketProvider({
 
   // Handle status changes
   useEffect(() => {
-    const unsubscribe = signalRClient.onStatusChange((newStatus) => {
+    const unsubscribe = signalRClient.onStatusChange((newStatus: ConnectionStatus) => {
       setStatus(newStatus);
       
       if (newStatus === 'connected') {
@@ -125,7 +125,7 @@ export function WebSocketProvider({
     }
 
     // Subscribe to dashboard stats update
-    const unsubDashboard = signalRClient.subscribe('dashboard.stats.updated', (_data) => {
+    const unsubDashboard = signalRClient.subscribe('dashboard.stats.updated', (_data: unknown) => {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       
       // Optional: Show notification for significant changes

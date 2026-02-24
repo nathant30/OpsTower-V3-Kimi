@@ -21,7 +21,7 @@ export const ConnectionStatus = ({
 
   useEffect(() => {
     // Subscribe to status changes
-    const unsubscribe = signalRClient.onStatusChange((newStatus) => {
+    const unsubscribe = signalRClient.onStatusChange((newStatus: ConnStatus) => {
       setStatus(newStatus);
     });
 
@@ -137,7 +137,7 @@ export const ConnectionStatusDot = ({ className = '' }: { className?: string }) 
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    const unsubscribe = signalRClient.onStatusChange((newStatus) => {
+    const unsubscribe = signalRClient.onStatusChange((newStatus: ConnStatus) => {
       setStatus(newStatus);
     });
     setStatus(signalRClient.getConnectionStatus());
@@ -176,7 +176,7 @@ export const ConnectionStatusBadge = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   useEffect(() => {
-    const unsubscribe = signalRClient.onStatusChange((newStatus) => {
+    const unsubscribe = signalRClient.onStatusChange((newStatus: ConnStatus) => {
       setStatus(newStatus);
       if (newStatus === 'connected') {
         setConnectionId(signalRClient.getConnectionId());
