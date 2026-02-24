@@ -26,7 +26,7 @@ async function main() {
       lastName: 'User',
       phone: '+639123456789',
       role: 'ADMIN',
-      status: 1,
+      isActive: true,
     },
   });
   console.log('✅ Created admin user:', admin.email);
@@ -41,8 +41,8 @@ async function main() {
       firstName: 'John',
       lastName: 'Dispatcher',
       phone: '+639123456790',
-      role: 'DISPATCHER',
-      status: 1,
+      role: 'DISPATCH_LEAD',
+      isActive: true,
     },
   });
   console.log('✅ Created dispatcher user:', dispatcher.email);
@@ -57,8 +57,8 @@ async function main() {
       firstName: 'Jane',
       lastName: 'Operator',
       phone: '+639123456791',
-      role: 'OPERATOR',
-      status: 1,
+      role: 'OVERWATCH_STAFF',
+      isActive: true,
     },
   });
   console.log('✅ Created operator user:', operator.email);
@@ -74,7 +74,7 @@ async function main() {
       lastName: 'Viewer',
       phone: '+639123456792',
       role: 'VIEWER',
-      status: 1,
+      isActive: true,
     },
   });
   console.log('✅ Created viewer user:', viewer.email);
