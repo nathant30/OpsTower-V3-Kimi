@@ -5,6 +5,19 @@ import jwt from '@fastify/jwt';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 
+// Import route handlers
+import authRoutes from './api/auth.routes.js';
+import driversRoutes from './api/drivers.routes.js';
+import fleetRoutes from './api/fleet.routes.js';
+import incidentsRoutes from './api/incidents.routes.js';
+import shiftsRoutes from './api/shifts.routes.js';
+import bondsRoutes from './api/bonds.routes.js';
+import financeRoutes from './api/finance.routes.js';
+import complianceRoutes from './api/compliance.routes.js';
+import kpiRoutes from './api/kpi.routes.js';
+import paymentsRoutes from './api/payments.routes.js';
+import locationRoutes from './api/location.routes.js';
+
 dotenv.config();
 
 const prisma = new PrismaClient({
@@ -42,17 +55,17 @@ fastify.register(jwt, {
 fastify.decorate('prisma', prisma);
 
 // Register API routes
-fastify.register(import('./api/auth.routes.js'), { prefix: '/api/auth' });
-fastify.register(import('./api/driver.routes.js'), { prefix: '/api/drivers' });
-fastify.register(import('./api/fleet.routes.js'), { prefix: '/api/fleet' });
-fastify.register(import('./api/incident.routes.js'), { prefix: '/api/incidents' });
-fastify.register(import('./api/shift.routes.js'), { prefix: '/api/shifts' });
-fastify.register(import('./api/bond.routes.js'), { prefix: '/api/bonds' });
-fastify.register(import('./api/finance.routes.js'), { prefix: '/api/finance' });
-fastify.register(import('./api/compliance.routes.js'), { prefix: '/api/compliance' });
-fastify.register(import('./api/kpi.routes.js'), { prefix: '/api/kpi' });
-fastify.register(import('./api/payments.routes.js'), { prefix: '/api/payments' });
-fastify.register(import('./api/location.routes.js'), { prefix: '/api/locations' });
+fastify.register(authRoutes, { prefix: '/api/auth' });
+fastify.register(driversRoutes, { prefix: '/api/drivers' });
+fastify.register(fleetRoutes, { prefix: '/api/fleet' });
+fastify.register(incidentsRoutes, { prefix: '/api/incidents' });
+fastify.register(shiftsRoutes, { prefix: '/api/shifts' });
+fastify.register(bondsRoutes, { prefix: '/api/bonds' });
+fastify.register(financeRoutes, { prefix: '/api/finance' });
+fastify.register(complianceRoutes, { prefix: '/api/compliance' });
+fastify.register(kpiRoutes, { prefix: '/api/kpi' });
+fastify.register(paymentsRoutes, { prefix: '/api/payments' });
+fastify.register(locationRoutes, { prefix: '/api/locations' });
 
 // Health check endpoint
 fastify.get('/health', async () => {
@@ -90,6 +103,3 @@ const start = async () => {
 start();
 
 export default fastify;
-// CI/CD Test: Tue 24 Feb 2026 08:47:21 PST
-// CI/CD Test Trigger
-// CI/CD Trigger: Azure Deployment Test 1771894102
