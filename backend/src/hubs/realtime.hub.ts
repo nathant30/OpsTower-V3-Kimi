@@ -49,7 +49,7 @@ export function initializeRealtimeHub(fastify: FastifyInstance) {
     });
 
     // Handle errors
-    socket.on('error', (error) => {
+    socket.on('error', (error: Error) => {
       console.error(`[WebSocket] Error for client ${clientId}:`, error);
     });
   });

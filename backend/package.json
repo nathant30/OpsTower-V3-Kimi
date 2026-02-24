@@ -50,6 +50,7 @@
     "@types/ioredis": "^4.28.10",
     "@types/jsonwebtoken": "^9.0.8",
     "@types/node": "^22.19.11",
+    "@types/ws": "^8.18.1",
     "@vitest/ui": "^3.0.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
