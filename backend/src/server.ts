@@ -41,6 +41,19 @@ fastify.register(jwt, {
 // Decorate fastify with prisma
 fastify.decorate('prisma', prisma);
 
+// Register API routes
+fastify.register(import('./api/auth.routes.js'), { prefix: '/api/auth' });
+fastify.register(import('./api/driver.routes.js'), { prefix: '/api/drivers' });
+fastify.register(import('./api/fleet.routes.js'), { prefix: '/api/fleet' });
+fastify.register(import('./api/incident.routes.js'), { prefix: '/api/incidents' });
+fastify.register(import('./api/shift.routes.js'), { prefix: '/api/shifts' });
+fastify.register(import('./api/bond.routes.js'), { prefix: '/api/bonds' });
+fastify.register(import('./api/finance.routes.js'), { prefix: '/api/finance' });
+fastify.register(import('./api/compliance.routes.js'), { prefix: '/api/compliance' });
+fastify.register(import('./api/kpi.routes.js'), { prefix: '/api/kpi' });
+fastify.register(import('./api/payments.routes.js'), { prefix: '/api/payments' });
+fastify.register(import('./api/location.routes.js'), { prefix: '/api/locations' });
+
 // Health check endpoint
 fastify.get('/health', async () => {
   return {
